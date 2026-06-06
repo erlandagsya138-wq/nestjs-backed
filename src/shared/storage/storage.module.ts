@@ -4,6 +4,9 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'path';
 
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { StoredFileEntity } from './domains/entities/stored-file.entity';
+
 // Adapters
 import { LocalStorageAdapter } from './infrastructures/adapters/local-storage.adapter';
 import { S3StorageAdapter } from './infrastructures/adapters/s3-storage.adapter';
@@ -42,7 +45,11 @@ import { AuthModule } from '../../identity/auth/auth.module';
      */
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     ServeStaticModule.forRootAsync({
-      imports: [ConfigModule],
+      imports: [
+        ConfigModule,
+        AuthModule,
+        TypeOrmModule.forFeature([StoredFileEntity]),
+      ],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const provider = config.get<string>('STORAGE_PROVIDER', 'local');

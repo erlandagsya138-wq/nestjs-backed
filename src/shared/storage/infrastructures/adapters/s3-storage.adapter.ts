@@ -1,4 +1,4 @@
-// src/storage/infrastructures/adapters/s3-storage.adapter.ts
+// src/shared/storage/infrastructures/adapters/s3-storage.adapter.ts
 import {
   Injectable,
   InternalServerErrorException,
@@ -16,34 +16,32 @@ import type {
   PutObjectCommandInput,
   DeleteObjectCommandInput,
   PutObjectCommandOutput,
-  DeleteObjectCommandOutput, // <-- FIX: Menambahkan import ini
+  DeleteObjectCommandOutput,
 } from '@aws-sdk/client-s3';
-import {
-  RawUploadedFile,
-  StoredFile,
-} from '../../domains/entities/stored-file.entity';
-import type { IStorageAdapter } from './storage.adapter.interface';
+import { RawUploadedFile } from '../../domains/entities/stored-file.entity';
+import type {
+  IStorageAdapter,
+  UploadResult,
+} from './storage.adapter.interface';
 
 @Injectable()
 export class S3StorageAdapter implements IStorageAdapter {
-  private readonly logger = new Logger(S3StorageAdapter.name);
-  private readonly client: S3Client;
-  private readonly bucket: string;
-  private readonly region: string;
+  private readonly logger:     Logger = new Logger(S3StorageAdapter.name);
+  private readonly client:     S3Client;
+  private readonly bucket:     string;
+  private readonly region:     string;
   private readonly cdnBaseUrl: string | null;
 
   constructor(private readonly config: ConfigService) {
-    this.region = this.config.getOrThrow<string>('AWS_REGION');
-    this.bucket = this.config.getOrThrow<string>('AWS_S3_BUCKET');
+    this.region     = this.config.getOrThrow<string>('AWS_REGION');
+    this.bucket     = this.config.getOrThrow<string>('AWS_S3_BUCKET');
     this.cdnBaseUrl = this.config.get<string>('AWS_CLOUDFRONT_URL') ?? null;
 
     const s3Config: S3ClientConfig = {
       region: this.region,
       credentials: {
-        accessKeyId: this.config.getOrThrow<string>('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.config.getOrThrow<string>(
-          'AWS_SECRET_ACCESS_KEY',
-        ),
+        accessKeyId:     this.config.getOrThrow<string>('AWS_ACCESS_KEY_ID'),
+        secretAccessKey: this.config.getOrThrow<string>('AWS_SECRET_ACCESS_KEY'),
       },
     };
 
@@ -52,13 +50,13 @@ export class S3StorageAdapter implements IStorageAdapter {
     this.client = new S3Client(s3Config);
   }
 
-  async upload(file: RawUploadedFile, fileKey: string): Promise<StoredFile> {
+  async upload(file: RawUploadedFile, fileKey: string): Promise<UploadResult> {
     try {
       const putCommandInput: PutObjectCommandInput = {
-        Bucket: this.bucket,
-        Key: fileKey,
-        Body: file.buffer,
-        ContentType: file.mimeType,
+        Bucket:        this.bucket,
+        Key:           fileKey,
+        Body:          file.buffer,
+        ContentType:   file.mimeType,
         ContentLength: file.sizeInBytes,
         Metadata: {
           originalName: encodeURIComponent(file.originalName),
@@ -74,15 +72,18 @@ export class S3StorageAdapter implements IStorageAdapter {
 
       this.logger.log(`[S3] File uploaded → s3://${this.bucket}/${fileKey}`);
 
-      return {
+      // Return UploadResult (plain object) — bukan StoredFileEntity.
+      // Mapper di layer atas yang akan mengkonversi ini ke entity.
+      const result: UploadResult = {
         fileKey,
-        imageUrl: this.buildPublicUrl(fileKey),
+        imageUrl:     this.buildPublicUrl(fileKey),
         originalName: file.originalName,
-        mimeType: file.mimeType,
-        sizeInBytes: file.sizeInBytes,
-        provider: 's3',
-        uploadedAt: new Date(),
+        mimeType:     file.mimeType,
+        sizeInBytes:  file.sizeInBytes,
+        provider:     's3',
       };
+
+      return result;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`[S3] Upload failed → ${message}`);
@@ -106,7 +107,7 @@ export class S3StorageAdapter implements IStorageAdapter {
     try {
       const deleteCommandInput: DeleteObjectCommandInput = {
         Bucket: this.bucket,
-        Key: fileKey,
+        Key:    fileKey,
       };
 
       // Reason: ESLint strict mode fails to resolve AWS SDK v3 class constructor types.

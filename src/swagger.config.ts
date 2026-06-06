@@ -63,15 +63,12 @@ File \`swagger.json\` juga otomatis di-generate ke root project saat server star
 ---
 
 ### Varietas Durian yang Didukung
-[FIX BUG-10] Tabel diperbarui: D101 dihapus karena tidak ada dalam training data model v10.
-Hanya 5 varietas resmi yang didukung (sesuai CLASS_NAMES di .env dan data/class_indices.json).
 
 | Kode | Nama Populer | Asal |
 |---|---|---|
 | D13 | Golden Bun | Malaysia (Johor) |
 | D197 | Musang King / Mao Shan Wang / Raja Kunyit | Malaysia (Kelantan) |
 | D2 | Dato Nina | Malaysia (Melaka) |
-| D200 | Black Thorn / Duri Hitam / Ochee | Malaysia (Penang) |
 | D24 | Sultan / Bukit Merah | Malaysia (Perak / Selangor) |
 
 Confidence score dikembalikan dalam rentang **0.0000 – 1.0000** (4 desimal).

@@ -39,7 +39,6 @@ export class MarketPriceRepository implements IMarketPriceRepository {
           rawTextSnippet:  d.rawTextSnippet,
           sourceName:      d.sourceName,
           sourceUrl:       d.sourceUrl,
-          runId:           d.runId,
           agentVersion:    d.agentVersion,
         });
         return entity;
@@ -57,7 +56,6 @@ export class MarketPriceRepository implements IMarketPriceRepository {
 
   async findByRunId(runId: string): Promise<MarketPriceEntity[]> {
     return this.ormRepo.find({
-      where: { runId },
       order: { createdAt: 'DESC' },
     });
   }

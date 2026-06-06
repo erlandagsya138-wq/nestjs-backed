@@ -10,10 +10,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 
 import { validate } from './shared/config/env.validation';
-import { UserEntity } from './identity/users/domains/entities/user.entity';
-import { PredictionEntity } from './ai-core/predictions/domains/entities/prediction.entity';
-// [FIX BUG-06] Import MarketPriceEntity agar TypeORM dapat membuat tabel market_prices
-import { MarketPriceEntity } from './market-intelligence/domains/entities/market-price.entity';
 
 // ── Feature Modules ───────────────────────────────────────────
 import { UserModule } from './identity/users/user.module';
@@ -22,10 +18,16 @@ import { PredictionModule } from './ai-core/predictions/prediction.module';
 import { StorageModule } from './shared/storage/storage.module';
 import { AiIntegrationModule } from './ai-core/ai-integration/ai-integration.module';
 // [FIX BUG-05] Import MarketIntelligenceModule agar endpoint /api/v1/ai-integration/market-report terdaftar
-import { MarketIntelligenceModule } from './market-intelligence/market-intelligence.module';
+import { MarketIntelligenceModule } from './ai-core/market-intelligence/market-intelligence.module';
 
 // ── Guards ────────────────────────────────────────────────────
 import { JwtAuthGuard } from './identity/auth/interface/guards/jwt-auth.guard';
+
+import { StoredFileEntity } from './shared/storage/domains/entities/stored-file.entity';
+import { UserEntity } from './identity/users/domains/entities/user.entity';
+import { PredictionEntity } from './ai-core/predictions/domains/entities/prediction.entity';
+import { MarketPriceEntity } from './ai-core/market-intelligence/domains/entities/market-price.entity';
+import { AgentRunEntity } from './ai-core/market-intelligence/domains/entities/agent-run.entity';
 
 @Module({
   imports: [
@@ -88,9 +90,7 @@ import { JwtAuthGuard } from './identity/auth/interface/guards/jwt-auth.guard';
           username: config.getOrThrow<string>('DB_USERNAME'),
           password: config.getOrThrow<string>('DB_PASSWORD'),
           database: config.getOrThrow<string>('DB_DATABASE'),
-          // [FIX BUG-06] Tambah MarketPriceEntity agar tabel market_prices dibuat
-          // oleh TypeORM synchronize saat development / migration saat production
-          entities: [UserEntity, PredictionEntity, MarketPriceEntity],
+          entities: [UserEntity, PredictionEntity, MarketPriceEntity, StoredFileEntity, AgentRunEntity],
           synchronize: isSynchronizeEnabled,
           logging: nodeEnv === 'development' ? ['query', 'error'] : ['error'],
           timezone: '+07:00',
@@ -113,16 +113,10 @@ import { JwtAuthGuard } from './identity/auth/interface/guards/jwt-auth.guard';
     UserModule,
     PredictionModule,
     AiIntegrationModule,
-    // [FIX BUG-05] MarketIntelligenceModule didaftarkan agar:
-    //   - Controller POST /api/v1/ai-integration/market-report terdaftar
-    //   - HmacSignatureGuard aktif memvalidasi request dari agent Python
-    //   - MarketPriceRepository tersedia untuk menyimpan data harga
     MarketIntelligenceModule,
   ],
 
   providers: [
-    // ── Global Guards ──────────────────────────────────────────
-    // ThrottlerGuard: rate-limiting untuk semua route
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

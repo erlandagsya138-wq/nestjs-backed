@@ -1,4 +1,4 @@
-// src/storage/infrastructures/adapters/local-storage.adapter.ts
+// src/shared/storage/infrastructures/adapters/local-storage.adapter.ts
 import {
   Injectable,
   InternalServerErrorException,
@@ -7,26 +7,26 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { RawUploadedFile } from '../../domains/entities/stored-file.entity';
 import {
-  RawUploadedFile,
-  StoredFile,
-} from '../../domains/entities/stored-file.entity';
-import { IStorageAdapter } from './storage.adapter.interface';
+  IStorageAdapter,
+  UploadResult,
+} from './storage.adapter.interface';
 
 @Injectable()
 export class LocalStorageAdapter implements IStorageAdapter {
-  private readonly logger = new Logger(LocalStorageAdapter.name);
+  private readonly logger   = new Logger(LocalStorageAdapter.name);
   private readonly uploadDir: string;
-  private readonly baseUrl: string;
+  private readonly baseUrl:   string;
 
   constructor(private readonly config: ConfigService) {
     this.uploadDir = this.config.get<string>('STORAGE_LOCAL_DIR', 'uploads');
-    this.baseUrl = this.config.getOrThrow<string>('APP_BASE_URL');
+    this.baseUrl   = this.config.getOrThrow<string>('APP_BASE_URL');
   }
 
-  async upload(file: RawUploadedFile, fileKey: string): Promise<StoredFile> {
+  async upload(file: RawUploadedFile, fileKey: string): Promise<UploadResult> {
     const fullPath = path.join(this.uploadDir, fileKey);
-    const dir = path.dirname(fullPath);
+    const dir      = path.dirname(fullPath);
 
     try {
       await fs.mkdir(dir, { recursive: true });
@@ -34,15 +34,18 @@ export class LocalStorageAdapter implements IStorageAdapter {
 
       this.logger.log(`[Local] File uploaded → ${fullPath}`);
 
-      return {
+      // Return UploadResult (plain object) — bukan StoredFileEntity.
+      // Mapper di layer atas yang akan mengkonversi ini ke entity.
+      const result: UploadResult = {
         fileKey,
-        imageUrl: this.buildPublicUrl(fileKey),
+        imageUrl:     this.buildPublicUrl(fileKey),
         originalName: file.originalName,
-        mimeType: file.mimeType,
-        sizeInBytes: file.sizeInBytes,
-        provider: 'local',
-        uploadedAt: new Date(),
+        mimeType:     file.mimeType,
+        sizeInBytes:  file.sizeInBytes,
+        provider:     'local',
       };
+
+      return result;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`[Local] Upload failed → ${message}`);

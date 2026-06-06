@@ -45,11 +45,13 @@ export class UploadFileUseCase {
     const rawFile = this.mapper.toRawUploadedFile(file);
     const stored  = await this.storageAdapter.upload(rawFile, fileKey);
 
+    const fileEntity = this.mapper.toEntity(stored, userId);
+
     this.eventEmitter.emit(
       'storage.file_uploaded',
-      new FileUploadedEvent(stored.fileKey, stored.imageUrl, userId, context, new Date()),
+      new FileUploadedEvent(fileEntity.fileKey, fileEntity.imageUrl, userId, context, new Date()),
     );
 
-    return this.mapper.toResponseDto(stored);
+    return this.mapper.toResponseDto(fileEntity);
   }
 }

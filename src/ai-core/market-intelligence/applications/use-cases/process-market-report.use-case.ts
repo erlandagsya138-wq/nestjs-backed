@@ -72,7 +72,6 @@ export class ProcessMarketReportUseCase {
           SOURCE_NAME_PLACEHOLDER,
           SOURCE_URL_PLACEHOLDER,
           run_id,
-          agent_version,
         ),
       );
 

@@ -17,7 +17,6 @@ export interface CreateMarketPriceData {
   rawTextSnippet:  string | null;
   sourceName:      string;
   sourceUrl:       string;
-  runId:           string;
   agentVersion:    string;
 }
 

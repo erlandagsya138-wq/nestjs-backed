@@ -81,13 +81,6 @@ export class MarketPriceResponseDto {
   sourceName: string = '';
 
   @ApiProperty({
-    description: 'UUID run agen yang menghasilkan record ini.',
-    example:     '1d80556a-e906-4729-976a-0951038dfcc9',
-    format:      'uuid',
-  })
-  runId: string = '';
-
-  @ApiProperty({
     description: 'Waktu record dibuat.',
     example:     '2024-01-15T20:00:00.000Z',
     format:      'date-time',
@@ -101,7 +94,6 @@ export class MarketPriceMapper {
     entry:        MarketPriceEntryDto,
     sourceName:   string,
     sourceUrl:    string,
-    runId:        string,
     agentVersion: string,
   ): CreateMarketPriceData {
     return {
@@ -120,7 +112,6 @@ export class MarketPriceMapper {
       rawTextSnippet:  entry.raw_text_snippet,
       sourceName,
       sourceUrl,
-      runId,
       agentVersion,
     };
   }
@@ -138,7 +129,6 @@ export class MarketPriceMapper {
       weightReference: entity.weightReference,
       confidence:      entity.confidence,
       sourceName:      entity.sourceName,
-      runId:           entity.runId,
       createdAt:       entity.createdAt,
     };
   }
