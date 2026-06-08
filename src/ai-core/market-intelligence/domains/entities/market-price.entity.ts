@@ -17,7 +17,6 @@ export enum DurianVarietyCode {
   D13  = 'D13',
   D197 = 'D197',
   D2   = 'D2',
-  D200 = 'D200',
   D24  = 'D24',
 }
 
