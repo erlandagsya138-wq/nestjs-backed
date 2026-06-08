@@ -1,6 +1,10 @@
+// src/ai-core/market-intelligence/infrastructures/repositories/market-price.repository.ts
+//
+// v3 Fix: Sertakan agentRunId saat create entity.
+
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository }       from 'typeorm';
 import { MarketPriceEntity } from '../../domains/entities/market-price.entity';
 import {
   CreateMarketPriceData,
@@ -17,13 +21,12 @@ export class MarketPriceRepository implements IMarketPriceRepository {
   ) {}
 
   async bulkCreate(data: CreateMarketPriceData[]): Promise<MarketPriceEntity[]> {
-    if (data.length === 0) {
-      return [];
-    }
+    if (data.length === 0) return [];
 
     try {
-      const entities = data.map((d) => {
-        const entity = this.ormRepo.create({
+      const entities = data.map((d) =>
+        this.ormRepo.create({
+          agentRunId:      d.agentRunId,     // ← FK ke agent_runs
           varietyCode:     d.varietyCode,
           varietyAlias:    d.varietyAlias,
           pricePerKgMin:   d.pricePerKgMin,
@@ -40,9 +43,8 @@ export class MarketPriceRepository implements IMarketPriceRepository {
           sourceName:      d.sourceName,
           sourceUrl:       d.sourceUrl,
           agentVersion:    d.agentVersion,
-        });
-        return entity;
-      });
+        }),
+      );
 
       return await this.ormRepo.save(entities);
     } catch (err: unknown) {
@@ -56,6 +58,7 @@ export class MarketPriceRepository implements IMarketPriceRepository {
 
   async findByRunId(runId: string): Promise<MarketPriceEntity[]> {
     return this.ormRepo.find({
+      where: { agentRunId: runId },
       order: { createdAt: 'DESC' },
     });
   }

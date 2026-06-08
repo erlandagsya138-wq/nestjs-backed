@@ -1,7 +1,12 @@
-// src/market-intelligence/infrastructures/repositories/market-price.repository.interface.ts
+// src/ai-core/market-intelligence/infrastructures/repositories/market-price.repository.interface.ts
+//
+// v3 Fix: Tambah agentRunId ke CreateMarketPriceData.
+// Sebelumnya field ini tidak ada sehingga FK ke agent_runs tidak terisi.
+
 import { DurianVarietyCode, MarketPriceEntity } from '../../domains/entities/market-price.entity';
 
 export interface CreateMarketPriceData {
+  agentRunId:      string;          // ← BARU: FK wajib ke agent_runs.id
   varietyCode:     DurianVarietyCode;
   varietyAlias:    string;
   pricePerKgMin:   number | null;

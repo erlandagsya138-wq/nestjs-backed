@@ -174,4 +174,24 @@ export class MarketPriceEntryDto {
   @IsOptional()
   @MaxLength(500)
   raw_text_snippet: string | null = null;
+
+  @ApiProperty({
+    description: 'Nama platform sumber data',
+    example: 'Tokopedia',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  source_name: string = '';
+
+  @ApiProperty({
+    description: 'URL spesifik ke halaman produk',
+    example: 'https://tokopedia.com/product/123',
+    maxLength: 512,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(512)
+  source_url: string = '';
 }

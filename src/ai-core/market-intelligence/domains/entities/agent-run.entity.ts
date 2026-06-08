@@ -1,4 +1,8 @@
 // src/ai-core/market-intelligence/domains/entities/agent-run.entity.ts
+//
+// v3 Fix: Tambah field agentVersion agar bisa dicatat versi Python agent
+// yang mengirim laporan. Diperlukan untuk tracing/debug.
+
 import {
   BeforeInsert,
   Column,
@@ -12,9 +16,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { AgentRunStatus } from './agent-run-status.entity';
 import { MarketPriceEntity } from './market-price.entity';
 
-// Enum ini disimpan sebagai varchar untuk fleksibilitas MySQL.
-// Perubahan nilai enum di MySQL membutuhkan ALTER TABLE yang mahal;
-// varchar menghindari hal itu.
 type TriggerSource = 'cron' | 'manual';
 
 @Entity({ name: 'agent_runs' })
@@ -38,37 +39,32 @@ export class AgentRunEntity {
   })
   status: AgentRunStatus = AgentRunStatus.NO_DATA;
 
-  // Siapa yang memicu run ini — saat ini selalu 'cron',
-  // tapi kolom ini future-proof jika manual trigger ditambahkan nanti
   @Column({ type: 'varchar', length: 20, nullable: false, default: 'cron' })
   triggeredBy: TriggerSource = 'cron';
 
+  // ── Versi Agent ──────────────────────────────────────────────
+  // Versi Python agent yang mengirim laporan ini.
+  // Berguna untuk tracing ketika ada perubahan format payload.
+  @Column({ type: 'varchar', length: 20, nullable: false, default: '1.0.0' })
+  agentVersion: string = '1.0.0';
+
   // ── Statistik Hasil Run ──────────────────────────────────────
-  // Berapa sumber yang dicoba di-scrape dalam satu run ini
   @Column({ type: 'int', unsigned: true, nullable: false, default: 0 })
   totalSources: number = 0;
 
-  // Berapa sumber yang berhasil di-scrape (tidak error)
   @Column({ type: 'int', unsigned: true, nullable: false, default: 0 })
   successSources: number = 0;
 
-  // Jumlah total record harga yang berhasil dikumpulkan
   @Column({ type: 'int', unsigned: true, nullable: false, default: 0 })
   totalPricesFound: number = 0;
 
-  // Ringkasan error jika status adalah PARTIAL atau SCRAPER_ERROR
-  // Berisi JSON array dari pesan error per sumber, atau null jika SUCCESS
   @Column({ type: 'text', nullable: true, default: null })
   errorSummary: string | null = null;
 
   // ── Timestamps ───────────────────────────────────────────────
-  // startedAt di-set manual di service (bukan @CreateDateColumn)
-  // karena kita ingin mencatat waktu aktual proses dimulai,
-  // bukan waktu record dibuat di DB
   @Column({ type: 'timestamp', nullable: false })
   startedAt: Date = new Date();
 
-  // completedAt di-update setelah semua scraping selesai
   @Column({ type: 'timestamp', nullable: true, default: null })
   completedAt: Date | null = null;
 
