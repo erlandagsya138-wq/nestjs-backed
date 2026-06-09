@@ -1,10 +1,4 @@
 // src/ai-core/market-intelligence/applications/use-cases/process-market-report.use-case.ts
-//
-// v3 Fix: Membuat AgentRunEntity dulu sebelum insert MarketPriceEntity.
-// Sebelumnya agentRunId di market_prices tidak ada FK yang valid
-// karena record di agent_runs tidak pernah dibuat, sehingga FK constraint
-// gagal dan semua insert market_prices ditolak.
-
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository }           from '@nestjs/typeorm';
 import { Repository }                 from 'typeorm';
@@ -22,8 +16,8 @@ import { MarketReportIngestedEvent } from '../../infrastructures/events/market-r
 import { AgentRunStatus }            from '../../domains/entities/agent-run-status.entity';
 import { AgentRunEntity }            from '../../domains/entities/agent-run.entity';
 
-const SOURCE_NAME_PLACEHOLDER = 'market-intelligence-agent';
-const SOURCE_URL_PLACEHOLDER  = 'internal';
+const FALLBACK_SOURCE_NAME = 'market-intelligence-agent';
+const FALLBACK_SOURCE_URL  = '';
 
 @Injectable()
 export class ProcessMarketReportUseCase {
@@ -47,21 +41,17 @@ export class ProcessMarketReportUseCase {
 
     this.logger.log(
       `[ProcessMarketReport] START → run_id=${run_id}, ` +
-        `agent_version=${agent_version}, ` +
-        `status=${status}, ` +
+        `agent_version=${agent_version}, status=${status}, ` +
         `total_entries=${entries.length}`,
     );
 
-    // ── 1. Buat atau update AgentRunEntity ──────────────────────────────────
-    // WAJIB dilakukan sebelum insert market_prices karena ada FK constraint.
-    // Gunakan upsert: jika run_id sudah ada (retry), update statusnya.
+    // ── 1. Upsert AgentRunEntity ────────────────────────────────────────────
     const agentRun = await this._upsertAgentRun(dto);
 
     // ── 2. Cek status actionable ────────────────────────────────────────────
     if (!this.domainService.isActionableStatus(status as AgentRunStatus)) {
       this.logger.warn(
-        `[ProcessMarketReport] Status tidak actionable → run_id=${run_id}, status=${status}. ` +
-          `Tidak ada data yang disimpan.`,
+        `[ProcessMarketReport] Status tidak actionable → run_id=${run_id}, status=${status}.`,
       );
       return {
         accepted:         true,
@@ -72,15 +62,14 @@ export class ProcessMarketReportUseCase {
       };
     }
 
-    // ── 3. Validasi & filter entries ────────────────────────────────────────
+    // ── 3. Validasi, filter dasar + IQR outlier detection ───────────────────
     const { valid, rejectedCount } = this.validator.filterWholeAndValid(
       entries,
       run_id,
     );
 
     this.logger.debug(
-      `[ProcessMarketReport] Validasi selesai → ` +
-        `valid=${valid.length}, rejected=${rejectedCount}`,
+      `[ProcessMarketReport] Setelah validasi → valid=${valid.length}, rejected=${rejectedCount}`,
     );
 
     // ── 4. Simpan ke database ───────────────────────────────────────────────
@@ -90,10 +79,12 @@ export class ProcessMarketReportUseCase {
       const createDataList = valid.map((entry) =>
         this.mapper.toCreateData(
           entry,
-          SOURCE_NAME_PLACEHOLDER,
-          SOURCE_URL_PLACEHOLDER,
-          run_id,          // agentVersion — pakai run_id sebagai versi agen
-          agentRun.id,     // agentRunId   — FK yang valid ke agent_runs
+          // Pakai source dari entry (nama platform asli seperti "Tokopedia"),
+          // fallback ke placeholder jika kosong.
+          entry.source_name || FALLBACK_SOURCE_NAME,
+          entry.source_url  || FALLBACK_SOURCE_URL,
+          agent_version,
+          agentRun.id,
         ),
       );
 
@@ -138,23 +129,15 @@ export class ProcessMarketReportUseCase {
     };
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
-
   private async _upsertAgentRun(dto: MarketReportDto): Promise<AgentRunEntity> {
     const { run_id, agent_version, status, sources_scraped, sources_failed } = dto;
 
-    // Cek apakah run_id sudah ada (hindari duplikasi)
     const existing = await this.agentRunRepo.findOne({ where: { id: run_id } });
-
     if (existing) {
-      this.logger.debug(
-        `[ProcessMarketReport] AgentRun sudah ada untuk run_id=${run_id}. ` +
-          `Gunakan yang existing.`,
-      );
+      this.logger.debug(`[ProcessMarketReport] AgentRun sudah ada → id=${run_id}`);
       return existing;
     }
 
-    // Buat record baru
     const agentRun = this.agentRunRepo.create({
       id:             run_id,
       status:         status as AgentRunStatus,

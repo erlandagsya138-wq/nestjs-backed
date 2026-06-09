@@ -1,3 +1,4 @@
+// src/ai-core/market-intelligence/infrastructures/guards/hmac-signature.guard.ts
 import {
   CanActivate,
   ExecutionContext,
@@ -33,11 +34,16 @@ export class HmacSignatureGuard implements CanActivate {
       );
     }
 
-    const rawBody = this.extractRawBody(request);
+    // rawBody dijamin terisi oleh verify callback di main.ts useBodyParser.
+    // Jika tidak ada, berarti request masuk lewat jalur non-JSON (tidak wajar
+    // untuk endpoint ini) — tolak segera daripada fallback ke stringify yang
+    // tidak deterministic.
+    const rawBody = request.rawBody;
 
-    if (rawBody === null) {
+    if (!rawBody || rawBody.length === 0) {
       this.logger.warn(
-        `[HmacSignatureGuard] Request ditolak — body tidak dapat dibaca untuk verifikasi.`,
+        `[HmacSignatureGuard] Request ditolak — rawBody tidak tersedia. ` +
+          `Pastikan Content-Type: application/json dan body tidak kosong.`,
       );
       throw new ForbiddenException(
         'Request body tidak tersedia untuk verifikasi signature.',
@@ -46,8 +52,8 @@ export class HmacSignatureGuard implements CanActivate {
 
     const expectedSignature = this.computeHmac(rawBody);
 
-    const signatureBuffer  = Buffer.from(signatureHeader, 'utf-8');
-    const expectedBuffer   = Buffer.from(`sha256=${expectedSignature}`, 'utf-8');
+    const signatureBuffer = Buffer.from(signatureHeader,                    'utf-8');
+    const expectedBuffer  = Buffer.from(`sha256=${expectedSignature}`, 'utf-8');
 
     const isValid =
       signatureBuffer.length === expectedBuffer.length &&
@@ -64,26 +70,6 @@ export class HmacSignatureGuard implements CanActivate {
     }
 
     return true;
-  }
-
-  private extractRawBody(request: Request & { rawBody?: Buffer }): Buffer | null {
-    if (request.rawBody instanceof Buffer) {
-      return request.rawBody;
-    }
-
-    if (typeof request.body === 'string') {
-      return Buffer.from(request.body, 'utf-8');
-    }
-
-    if (request.body !== null && request.body !== undefined) {
-      try {
-        return Buffer.from(JSON.stringify(request.body), 'utf-8');
-      } catch {
-        return null;
-      }
-    }
-
-    return null;
   }
 
   private computeHmac(body: Buffer): string {

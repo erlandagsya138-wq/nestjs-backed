@@ -1,14 +1,16 @@
 // src/ai-core/market-intelligence/infrastructures/repositories/market-price.repository.ts
 //
-// v3 Fix: Sertakan agentRunId saat create entity.
+// Tambahan: findCurrentAverages() — query view variety_price_avg.
+// Ini satu-satunya method yang dipanggil untuk menampilkan harga ke pengguna.
 
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository }       from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { MarketPriceEntity } from '../../domains/entities/market-price.entity';
 import {
   CreateMarketPriceData,
   IMarketPriceRepository,
+  VarietyPriceAverage,
 } from './market-price.repository.interface';
 
 @Injectable()
@@ -18,6 +20,8 @@ export class MarketPriceRepository implements IMarketPriceRepository {
   constructor(
     @InjectRepository(MarketPriceEntity)
     private readonly ormRepo: Repository<MarketPriceEntity>,
+
+    private readonly dataSource: DataSource,
   ) {}
 
   async bulkCreate(data: CreateMarketPriceData[]): Promise<MarketPriceEntity[]> {
@@ -26,7 +30,7 @@ export class MarketPriceRepository implements IMarketPriceRepository {
     try {
       const entities = data.map((d) =>
         this.ormRepo.create({
-          agentRunId:      d.agentRunId,     // ← FK ke agent_runs
+          agentRunId:      d.agentRunId,
           varietyCode:     d.varietyCode,
           varietyAlias:    d.varietyAlias,
           pricePerKgMin:   d.pricePerKgMin,
@@ -52,6 +56,35 @@ export class MarketPriceRepository implements IMarketPriceRepository {
       this.logger.error(`[MarketPriceRepository] bulkCreate gagal: ${message}`);
       throw new InternalServerErrorException(
         `Gagal menyimpan data harga pasar: ${message}`,
+      );
+    }
+  }
+
+  /**
+   * Query view variety_price_avg — hasil agregasi bersih siap ditampilkan ke pengguna.
+   * Kembalikan array terurut: D197, D13, D24, D2.
+   */
+  async findCurrentAverages(): Promise<VarietyPriceAverage[]> {
+    try {
+      const rows = await this.dataSource.query<VarietyPriceAverage[]>(
+        `SELECT
+           variety_code,
+           variety_name,
+           avg_price_per_unit,
+           min_price_per_unit,
+           max_price_per_unit,
+           avg_price_per_kg,
+           sample_count,
+           avg_confidence,
+           latest_data_at
+         FROM variety_price_avg`,
+      );
+      return rows;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[MarketPriceRepository] findCurrentAverages gagal: ${message}`);
+      throw new InternalServerErrorException(
+        `Gagal mengambil rata-rata harga: ${message}`,
       );
     }
   }
