@@ -1,4 +1,4 @@
-// src/predictions/prediction.module.ts
+// src/ai-core/predictions/prediction.module.ts
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -14,15 +14,21 @@ import { FindPredictionsByUserUseCase } from './applications/use-cases/find-pred
 import { PredictionOrchestrator } from './applications/orchestrator/prediction.orchestrator';
 import { PredictionController } from './interface/http/prediction.controller';
 import { PredictionCreatedLogListener } from './infrastructures/listeners/prediction-created.listener';
-
-// forwardRef() memutus circular dependency:
-// PredictionModule → AiIntegrationModule → PredictionModule
 import { AiIntegrationModule } from '../ai-integration/ai-integration.module';
+
+// StorageModule di-import agar UploadFileUseCase tersedia untuk di-inject
+// ke CreatePredictionUseCase. Ini memungkinkan 1 request POST /predictions
+// menjalankan upload + predict secara sequential dalam satu transaksi logis.
+import { StorageModule } from '../../shared/storage/storage.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([PredictionEntity]),
     forwardRef(() => AiIntegrationModule),
+
+    // StorageModule menyediakan: UploadFileUseCase, StorageDomainService,
+    // StorageAdapterProvider, dan StoredFileRepository
+    StorageModule,
   ],
   controllers: [PredictionController],
   providers: [

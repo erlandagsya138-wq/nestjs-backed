@@ -1,10 +1,9 @@
-// src/predictions/infrastructures/repositories/prediction.repository.interface.ts
+// src/ai-core/predictions/infrastructures/repositories/prediction.repository.interface.ts
 import { PredictionEntity } from '../../domains/entities/prediction.entity';
 
-// ── BARU: tipe data untuk satu entri all_varieties yang disimpan di DB ──
 export interface VarietyScoreData {
-  varietyCode: string;
-  varietyName: string;
+  varietyCode:     string;
+  varietyName:     string;
   confidenceScore: number;
 }
 
@@ -17,10 +16,18 @@ export interface PredictionResultPayload {
   confidenceScore: number;
   imageEnhanced:   boolean;
   inferenceTimeMs: number;
-  // ── BARU ──
   allVarieties:    VarietyScoreData[];
   modelVersion:    string | null;
   aiRequestId:     string | null;
+}
+
+// Data wajib saat membuat prediction baru.
+// storedFileId sekarang required — tidak boleh ada prediction tanpa
+// referensi ke file yang menghasilkannya.
+export interface CreatePredictionData {
+  userId:        string;
+  storedFileId:  string;
+  imageUrl:      string;
 }
 
 export interface IPredictionRepository {
@@ -28,10 +35,12 @@ export interface IPredictionRepository {
   findAllByUserId(userId: string): Promise<PredictionEntity[]>;
   findAllByUserIdPaginated(
     userId: string,
-    skip: number,
-    limit: number,
+    skip:   number,
+    limit:  number,
   ): Promise<[PredictionEntity[], number]>;
-  create(data: Partial<PredictionEntity>): Promise<PredictionEntity>;
+  // Signature diperketat: terima CreatePredictionData bukan Partial<PredictionEntity>
+  // agar storedFileId tidak bisa luput (compile-time enforcement)
+  create(data: CreatePredictionData): Promise<PredictionEntity>;
   updateResult(id: string, result: PredictionResultPayload): Promise<PredictionEntity>;
   markAsFailed(id: string, reason: string): Promise<void>;
 }

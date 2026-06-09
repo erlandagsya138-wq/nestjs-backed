@@ -1,6 +1,5 @@
-// src/predictions/interface/http/prediction.controller.ts
+// src/ai-core/predictions/interface/http/prediction.controller.ts
 import {
-  Body,
   Controller,
   Get,
   HttpCode,
@@ -11,11 +10,16 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  UploadedFile,
   UseFilters,
   UseGuards,
+  UseInterceptors,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -25,11 +29,12 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
-  ApiForbiddenResponse,
   ApiServiceUnavailableResponse,
+  ApiPayloadTooLargeResponse,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import * as multer from 'multer';
 import { PredictionOrchestrator } from '../../applications/orchestrator/prediction.orchestrator';
-import { CreatePredictionDto } from '../../applications/dto/create-prediction.dto';
 import {
   PaginatedPredictionResponseDto,
   PredictionResponseDto,
@@ -38,6 +43,11 @@ import { FindPredictionsQueryDto } from '../../applications/dto/find-predictions
 import { PredictionExceptionFilter } from '../filters/prediction-exception.filter';
 import { JwtAuthGuard } from '../../../../identity/auth/interface/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../identity/auth/interface/decorators/current-user.decorator';
+
+// Multer memory storage — file buffer tersedia di memory untuk langsung
+// dikirim ke UploadFileUseCase tanpa perlu baca ulang dari disk.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+const memoryStorage = multer.memoryStorage();
 
 @ApiTags('Predictions')
 @ApiBearerAuth('JWT')
@@ -53,49 +63,86 @@ export class PredictionController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  // FileInterceptor memproses field 'file' dari multipart/form-data
+  @UseInterceptors(
+    FileInterceptor('file', {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      storage: memoryStorage,
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB — sama dengan StorageModule
+        files:    1,
+      },
+    }),
+  )
   @ApiOperation({
-    summary:     'Buat prediksi baru',
+    summary:     'Buat prediksi baru (upload + predict dalam 1 request)',
     description:
-      '**Flow lengkap:**\n\n' +
-      '1. Upload gambar → `POST /api/v1/storage/upload` → dapat `imageUrl`\n' +
-      '2. Kirim `imageUrl` ke endpoint ini\n' +
-      '3. Prediksi dibuat dengan status `PENDING`\n' +
-      '4. AI service memproses secara async (biasanya < 5 detik)\n' +
-      '5. Ambil hasil → `GET /api/v1/predictions/:id`\n\n' +
-      '**userId diambil otomatis dari JWT** — tidak perlu dikirim di body.',
+      '**Upload gambar dan prediksi dalam satu request.**\n\n' +
+      'Backend akan:\n' +
+      '1. Upload dan simpan gambar ke storage\n' +
+      '2. Mencatat file ke database (`stored_files`)\n' +
+      '3. Membuat record prediksi (`predictions`)\n' +
+      '4. Mengirim ke AI untuk dianalisis\n' +
+      '5. Mengembalikan hasil prediksi\n\n' +
+      '**Format file:** JPG, PNG, WebP\n\n' +
+      '**Ukuran maksimum:** 5MB\n\n' +
+      '`userId` diambil otomatis dari JWT.',
     operationId: 'predictionsCreate',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'File gambar durian (JPG/PNG/WebP, maks 5MB)',
+    schema: {
+      type:     'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type:        'string',
+          format:      'binary',
+          description: 'File gambar durian yang akan diklasifikasi',
+        },
+      },
+    },
   })
   @ApiCreatedResponse({
     type:        PredictionResponseDto,
-    description: 'Prediksi berhasil dibuat dengan status `PENDING`.',
+    description: 'Prediksi berhasil diproses.',
   })
   @ApiUnauthorizedResponse({ description: 'Token tidak valid atau expired.' })
   @ApiUnprocessableEntityResponse({
-    description: 'imageUrl tidak valid atau mengarah ke jaringan internal.',
+    description: 'File tidak ada atau format tidak didukung (bukan JPG/PNG/WebP).',
+  })
+  @ApiPayloadTooLargeResponse({
+    description: 'Ukuran file melebihi batas 5MB.',
   })
   @ApiServiceUnavailableResponse({
     description: 'AI service sedang offline atau model belum siap.',
   })
   create(
-    @Body() dto: CreatePredictionDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser('sub') authenticatedUserId: string,
   ): Promise<PredictionResponseDto> {
-    if (!authenticatedUserId || authenticatedUserId.trim().length === 0) {
+    if (!authenticatedUserId?.trim()) {
       this.logger.error(
-        '[PredictionController] authenticatedUserId kosong dari @CurrentUser("sub"). ' +
-          'Kemungkinan dist/ stale. Jalankan: rmdir /s /q dist && npm run build',
+        '[PredictionController] authenticatedUserId kosong dari @CurrentUser("sub").',
       );
       throw new InternalServerErrorException(
-        'Gagal mengidentifikasi user dari token. ' +
-          'Coba logout, login kembali, dan pastikan server di-rebuild.',
+        'Gagal mengidentifikasi user dari token. Coba logout dan login kembali.',
+      );
+    }
+
+    if (!file) {
+      throw new UnprocessableEntityException(
+        'File gambar wajib disertakan dalam request.',
       );
     }
 
     this.logger.debug(
-      `[PredictionController] create → userId=${authenticatedUserId}`,
+      `[PredictionController] create → userId=${authenticatedUserId}, ` +
+      `file=${file.originalname} (${file.size} bytes)`,
     );
 
-    return this.orchestrator.create(dto, authenticatedUserId);
+    return this.orchestrator.create(file, authenticatedUserId);
   }
 
   // ── List my predictions ────────────────────────────────────────────────────
@@ -107,24 +154,15 @@ export class PredictionController {
     description: 'Mengambil semua prediksi milik user yang sedang login dengan pagination.',
     operationId: 'predictionsGetMyList',
   })
-  @ApiQuery({
-    name: 'page', type: Number, required: false, example: 1,
-    description: 'Nomor halaman, mulai dari 1 (default: 1)',
-  })
-  @ApiQuery({
-    name: 'limit', type: Number, required: false, example: 10,
-    description: 'Jumlah item per halaman, maksimum 50 (default: 10)',
-  })
-  @ApiOkResponse({
-    type:        PaginatedPredictionResponseDto,
-    description: 'List prediksi berhasil diambil.',
-  })
+  @ApiQuery({ name: 'page',  type: Number, required: false, example: 1  })
+  @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
+  @ApiOkResponse({ type: PaginatedPredictionResponseDto })
   @ApiUnauthorizedResponse({ description: 'Token tidak valid.' })
   getAllByUser(
     @CurrentUser('sub') authenticatedUserId: string,
     @Query() query: FindPredictionsQueryDto,
   ): Promise<PaginatedPredictionResponseDto> {
-    if (!authenticatedUserId || authenticatedUserId.trim().length === 0) {
+    if (!authenticatedUserId?.trim()) {
       throw new InternalServerErrorException(
         'Gagal mengidentifikasi user dari token. Coba logout dan login kembali.',
       );
@@ -138,25 +176,18 @@ export class PredictionController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:     'Detail prediksi',
-    description:
-      'Mengambil detail prediksi berdasarkan ID.\n\n' +
-      '**Hanya bisa mengakses prediksi milik sendiri.**',
+    description: 'Mengambil detail prediksi berdasarkan ID. **Hanya bisa mengakses prediksi milik sendiri.**',
     operationId: 'predictionsGetById',
   })
-  @ApiParam({
-    name: 'id', type: 'string', format: 'uuid',
-    description: 'UUID prediksi',
-    example:     '550e8400-e29b-41d4-a716-446655440000',
-  })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiOkResponse({ type: PredictionResponseDto })
   @ApiUnauthorizedResponse({ description: 'Token tidak valid.' })
-  @ApiForbiddenResponse({ description: 'Prediksi ini bukan milik Anda.' })
   @ApiNotFoundResponse({ description: 'Prediksi tidak ditemukan.' })
   getById(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser('sub') requestingUserId: string,
   ): Promise<PredictionResponseDto> {
-    if (!requestingUserId || requestingUserId.trim().length === 0) {
+    if (!requestingUserId?.trim()) {
       throw new InternalServerErrorException(
         'Gagal mengidentifikasi user dari token. Coba logout dan login kembali.',
       );

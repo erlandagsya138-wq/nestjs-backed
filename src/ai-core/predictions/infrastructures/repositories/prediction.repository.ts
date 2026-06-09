@@ -1,4 +1,4 @@
-// src/predictions/infrastructures/repositories/prediction.repository.ts
+// src/ai-core/predictions/infrastructures/repositories/prediction.repository.ts
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,6 +10,7 @@ import {
 import {
   IPredictionRepository,
   PredictionResultPayload,
+  CreatePredictionData,
 } from './prediction.repository.interface';
 
 @Injectable()
@@ -43,23 +44,27 @@ export class PredictionRepository implements IPredictionRepository {
     });
   }
 
-  async create(data: Partial<PredictionEntity>): Promise<PredictionEntity> {
-    if (!data.userId || data.userId.trim().length === 0) {
+  async create(data: CreatePredictionData): Promise<PredictionEntity> {
+    // Guard — semua field wajib (seharusnya sudah dicek di use case,
+    // tapi defense-in-depth di repository layer)
+    if (!data.userId.trim()) {
       throw new InternalServerErrorException(
-        'Tidak dapat membuat prediction: userId kosong. ' +
-          'Pastikan JWT token valid dan JwtStrategy.validate() ' +
-          'mengembalikan { sub: uuid, email: "..." }.',
+        'Tidak dapat membuat prediction: userId kosong.',
       );
     }
-
-    if (!data.imageUrl || data.imageUrl.trim().length === 0) {
+    if (!data.storedFileId.trim()) {
+      throw new InternalServerErrorException(
+        'Tidak dapat membuat prediction: storedFileId kosong. ' +
+        'Pastikan file berhasil di-upload dan di-persist ke DB terlebih dahulu.',
+      );
+    }
+    if (!data.imageUrl.trim()) {
       throw new InternalServerErrorException(
         'Tidak dapat membuat prediction: imageUrl kosong.',
       );
     }
 
-    const id     = uuidv4();
-    const userId = data.userId.trim();
+    const id = uuidv4();
 
     await this.ormRepo
       .createQueryBuilder()
@@ -67,9 +72,10 @@ export class PredictionRepository implements IPredictionRepository {
       .into(PredictionEntity)
       .values({
         id,
-        userId,
-        imageUrl: data.imageUrl.trim(),
-        status:   PredictionStatus.PENDING,
+        userId:       data.userId.trim(),
+        storedFileId: data.storedFileId.trim(), // ← sebelumnya tidak ada
+        imageUrl:     data.imageUrl.trim(),
+        status:       PredictionStatus.PENDING,
       })
       .execute();
 
@@ -84,7 +90,7 @@ export class PredictionRepository implements IPredictionRepository {
     return created;
   }
 
-   async updateResult(
+  async updateResult(
     id:     string,
     result: PredictionResultPayload,
   ): Promise<PredictionEntity> {
@@ -97,7 +103,6 @@ export class PredictionRepository implements IPredictionRepository {
       confidenceScore: result.confidenceScore,
       imageEnhanced:   result.imageEnhanced,
       inferenceTimeMs: result.inferenceTimeMs,
-      // ── BARU ──
       allVarieties:    result.allVarieties,
       modelVersion:    result.modelVersion,
       aiRequestId:     result.aiRequestId,
@@ -108,7 +113,7 @@ export class PredictionRepository implements IPredictionRepository {
 
     if (!updated) {
       throw new Error(
-        `Prediction id '${id}' tidak ditemukan setelah updateResult.`,
+        `Prediction id='${id}' tidak ditemukan setelah updateResult.`,
       );
     }
 
@@ -124,7 +129,7 @@ export class PredictionRepository implements IPredictionRepository {
     if (result.affected === 0) {
       console.warn(
         `[PredictionRepository] markAsFailed: id='${id}' tidak ditemukan ` +
-          `(0 rows affected). reason='${reason}'`,
+        `(0 rows affected). reason='${reason}'`,
       );
     }
   }
