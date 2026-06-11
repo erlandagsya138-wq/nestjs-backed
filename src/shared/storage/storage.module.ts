@@ -1,4 +1,4 @@
-// src/storage/storage.module.ts
+// src/shared/storage/storage.module.ts
 import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -11,6 +11,10 @@ import { StoredFileEntity } from './domains/entities/stored-file.entity';
 import { LocalStorageAdapter } from './infrastructures/adapters/local-storage.adapter';
 import { S3StorageAdapter } from './infrastructures/adapters/s3-storage.adapter';
 import { StorageAdapterProvider } from './infrastructures/providers/storage-adapter.provider';
+
+// Repository
+import { StoredFileRepository } from './infrastructures/repositories/stored-file.repository';
+import { STORED_FILE_REPOSITORY_TOKEN } from './infrastructures/repositories/stored-file.repository.interface';
 
 // Domain
 import { StorageDomainService } from './domains/services/storage-domain.service';
@@ -31,26 +35,17 @@ import { FileSizeGuard } from './interface/guards/file-size.guard';
 // Events & Listeners
 import { FileUploadedListener } from './infrastructures/listeners/file-uploaded.listener';
 
-// Auth (untuk JwtAuthGuard di controller)
+// Auth
 import { AuthModule } from '../../identity/auth/auth.module';
 
 @Module({
   imports: [
     AuthModule,
+    TypeOrmModule.forFeature([StoredFileEntity]),
 
-    /**
-     * ServeStaticModule hanya aktif jika STORAGE_PROVIDER=local.
-     * Menyajikan file dari folder uploads/ secara publik.
-     * Contoh URL: http://localhost:3000/uploads/predictions/userId/file.jpg
-     */
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     ServeStaticModule.forRootAsync({
-      imports: [
-        ConfigModule,
-        AuthModule,
-        TypeOrmModule.forFeature([StoredFileEntity]),
-      ],
-      inject: [ConfigService],
+      imports: [ConfigModule],
+      inject:  [ConfigService],
       useFactory: (config: ConfigService) => {
         const provider = config.get<string>('STORAGE_PROVIDER', 'local');
         if (provider !== 'local') return [];
@@ -63,7 +58,7 @@ import { AuthModule } from '../../identity/auth/auth.module';
             ),
             serveRoot: '/uploads',
             serveStaticOptions: {
-              index: false,
+              index:     false,
               fallthrough: false,
             },
           },
@@ -73,12 +68,16 @@ import { AuthModule } from '../../identity/auth/auth.module';
   ],
   controllers: [StorageController],
   providers: [
-    // ── Adapters (semua diinstansiasi, provider memilih satu) ──
+    // ── Adapters ───────────────────────────────────────────────
     LocalStorageAdapter,
     S3StorageAdapter,
-
-    // ── Dynamic Provider (Dependency Inversion) ────────────────
     StorageAdapterProvider,
+
+    // ── Repository ─────────────────────────────────────────────
+    {
+      provide:  STORED_FILE_REPOSITORY_TOKEN,
+      useClass: StoredFileRepository,
+    },
 
     // ── Domain Layer ───────────────────────────────────────────
     StorageDomainService,
@@ -97,7 +96,9 @@ import { AuthModule } from '../../identity/auth/auth.module';
     FileUploadedListener,
   ],
   exports: [
-    // Di-export agar AiIntegrationModule bisa download file dari storage
+    // Di-export agar PredictionModule bisa memanggil UploadFileUseCase
+    // langsung dari dalam CreatePredictionUseCase (1 request = upload + predict)
+    STORED_FILE_REPOSITORY_TOKEN,
     StorageOrchestrator,
     StorageDomainService,
     UploadFileUseCase,

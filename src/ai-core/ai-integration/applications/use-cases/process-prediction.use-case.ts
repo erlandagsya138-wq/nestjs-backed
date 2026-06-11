@@ -72,14 +72,11 @@ export class ProcessPredictionUseCase {
         ? err.message
         : 'Unknown error dari AI service';
 
-      // 👇 PERBAIKAN LOGGING ERROR ADA DI SINI 👇
       if (err instanceof UnprocessableEntityException) {
-        // Jika error validasi/bisnis (contoh: bukan gambar durian), gunakan .warn tanpa stack trace
         this.logger.warn(
           `[ProcessPrediction] FAILED → id=${predictionId}, reason=${reason}`
         );
       } else {
-        // Jika error sistem yang tidak terduga, gunakan .error dengan stack trace
         this.logger.error(
           `[ProcessPrediction] SYSTEM ERROR → id=${predictionId}, reason=${reason}`,
           err instanceof Error ? err.stack : undefined,

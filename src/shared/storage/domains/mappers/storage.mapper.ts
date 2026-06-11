@@ -18,8 +18,6 @@ export interface IUploadedFile {
 export class StorageMapper {
   /**
    * Mengkonversi file mentah dari Multer ke RawUploadedFile.
-   * RawUploadedFile adalah DTO internal pipeline upload sebelum
-   * data di-persist — bukan TypeORM entity.
    */
   toRawUploadedFile(file: IUploadedFile): RawUploadedFile {
     return {
@@ -34,37 +32,38 @@ export class StorageMapper {
    * Mengkonversi UploadResult (return value adapter) + userId
    * ke StoredFileEntity yang siap di-persist ke database.
    *
-   * userId diperlukan karena adapter tidak tahu konteks user —
-   * hanya tahu tentang file storage. Mapper yang menggabungkan
-   * kedua konteks ini.
+   * PENTING: Entity yang dihasilkan belum memiliki `id` dan `createdAt`
+   * — keduanya di-generate saat `repository.save()` via @BeforeInsert
+   * dan @CreateDateColumn.
    */
   toEntity(result: UploadResult, userId: string): StoredFileEntity {
-    const entity       = new StoredFileEntity();
-    entity.userId      = userId;
-    entity.fileKey     = result.fileKey;
-    entity.imageUrl    = result.imageUrl;
+    const entity        = new StoredFileEntity();
+    entity.userId       = userId;
+    entity.fileKey      = result.fileKey;
+    entity.imageUrl     = result.imageUrl;
     entity.originalName = result.originalName;
-    entity.mimeType    = result.mimeType;
-    entity.sizeInBytes = result.sizeInBytes;
-    entity.provider    = result.provider;
-    // id dan createdAt di-generate otomatis via @BeforeInsert dan @CreateDateColumn
+    entity.mimeType     = result.mimeType;
+    entity.sizeInBytes  = result.sizeInBytes;
+    entity.provider     = result.provider;
     return entity;
   }
 
   /**
-   * Mengkonversi StoredFileEntity ke DTO response untuk API.
-   * Field uploadedAt di-map dari createdAt karena StoredFile lama
-   * menggunakan uploadedAt, sedangkan entity baru menggunakan createdAt.
+   * Mengkonversi StoredFileEntity yang sudah di-persist ke DTO response.
+   *
+   * Menerima entity yang sudah di-save (bukan UploadResult mentah) agar
+   * `storedFileId` yang dihasilkan DB bisa disertakan dalam response.
    */
   toResponseDto(entity: StoredFileEntity): StorageResponseDto {
     return {
+      storedFileId: entity.id,        // ID dari DB — tersedia setelah save()
       fileKey:      entity.fileKey,
       imageUrl:     entity.imageUrl,
       originalName: entity.originalName,
       mimeType:     entity.mimeType,
       sizeInBytes:  entity.sizeInBytes,
       provider:     entity.provider,
-      uploadedAt:   entity.createdAt,
+      uploadedAt:   entity.createdAt, // createdAt tersedia setelah save()
     };
   }
 }

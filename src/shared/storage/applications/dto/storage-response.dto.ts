@@ -1,8 +1,14 @@
-// src/storage/applications/dto/storage-response.dto.ts
+// src/shared/storage/applications/dto/storage-response.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 import type { StorageProvider } from './upload-file.dto';
 
 export class StorageResponseDto {
+  @ApiProperty({
+    description: 'UUID record StoredFile di database. Digunakan secara internal — tidak perlu dikirim ulang ke /predictions karena flow sudah terintegrasi.',
+    example:     'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+  })
+  storedFileId: string = '';
+
   @ApiProperty({
     description: 'Unique key file di storage (path relatif atau S3 key).',
     example:     'predictions/user-id/abc12345.jpg',
@@ -10,9 +16,8 @@ export class StorageResponseDto {
   fileKey: string = '';
 
   @ApiProperty({
-    description:
-      'URL publik file. Gunakan value ini sebagai `imageUrl` saat membuat prediksi.',
-    example: 'http://localhost:3000/uploads/predictions/user-id/abc12345.jpg',
+    description: 'URL publik file.',
+    example:     'http://localhost:3000/uploads/predictions/user-id/abc12345.jpg',
   })
   imageUrl: string = '';
 
