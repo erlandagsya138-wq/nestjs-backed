@@ -33,6 +33,8 @@ export class MarketPriceRepository implements IMarketPriceRepository {
           agentRunId:      d.agentRunId,
           varietyCode:     d.varietyCode,
           varietyAlias:    d.varietyAlias,
+          pricePerUnit:    d.pricePerUnit,
+          pricePerKgAvg:   d.pricePerKgAvg,
           weightReference: d.weightReference,
           notes:           d.notes,
           confidence:      d.confidence,
