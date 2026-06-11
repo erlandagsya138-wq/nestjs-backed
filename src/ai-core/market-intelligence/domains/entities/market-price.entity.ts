@@ -1,4 +1,20 @@
 // src/ai-core/market-intelligence/domains/entities/market-price.entity.ts
+//
+// v4 Schema Cleanup:
+//   - HAPUS pricePerKgMin, pricePerKgMax  → Python agent tidak pernah mengisi,
+//     range per-kg tidak relevan untuk card "perkiraan harga per buah".
+//   - HAPUS pricePerUnitMax               → selalu identik dengan pricePerUnitMin
+//     (satu listing = satu titik harga). Rename pricePerUnitMin → pricePerUnit.
+//   - HAPUS locationHint                  → jarang terisi (<5% listing), tidak
+//     dipakai di card hasil scan.
+//   - HAPUS sellerType                    → kategorisasi kasar dari regex,
+//     tidak relevan untuk alur bisnis consumer protection.
+//   - HAPUS rawTextSnippet                → debug artifact, bukan data bisnis.
+//
+// Column yang tersisa mendukung use case utama:
+//   "Tampilkan card: jenis varietas + confidence + perkiraan harga Rp X – Rp Y"
+//   → harga diambil dari agregasi pricePerUnit di view variety_price_avg.
+
 import {
   BeforeInsert,
   Column,
@@ -20,9 +36,9 @@ export enum DurianVarietyCode {
   D24  = 'D24',
 }
 
-// Transformer ini wajib ada karena MySQL mengembalikan DECIMAL sebagai string.
-// Tanpa transformer, operasi aritmatika pada harga akan silent fail
-// (misal: 50000 + 1000 menjadi "500001000" karena string concatenation)
+// Transformer wajib ada: MySQL mengembalikan DECIMAL sebagai string.
+// Tanpa ini, operasi aritmatika pada harga silent fail
+// (50000 + 1000 menjadi "500001000" karena string concatenation).
 const decimalTransformer: ValueTransformer = {
   to:   (v: number | null) => v,
   from: (v: string | null): number | null => {
@@ -46,38 +62,31 @@ export class MarketPriceEntity {
   }
 
   // ── Foreign Key ──────────────────────────────────────────────
-  // Menggantikan raw 'runId: string' dengan FK yang proper ke agent_runs
-  // (fix M6/M7 dari analisis Phase 1)
   @Column({ type: 'varchar', length: 36, nullable: false })
   agentRunId: string = '';
 
-  // ── Price Data ───────────────────────────────────────────────
+  // ── Identitas Varietas ───────────────────────────────────────
   @Column({ type: 'enum', enum: DurianVarietyCode, nullable: false })
   varietyCode: DurianVarietyCode = DurianVarietyCode.D197;
 
   @Column({ type: 'varchar', length: 100, nullable: false })
   varietyAlias: string = '';
 
+  // ── Harga ────────────────────────────────────────────────────
+  // Satu listing = satu titik harga per buah utuh (IDR).
+  // Range "Rp X – Rp Y" pada card hasil scan dihasilkan dari
+  // agregasi MIN/MAX column ini di view variety_price_avg.
   @Column({
     type:        'decimal',
     precision:   12,
     scale:       2,
-    nullable:    true,
-    default:     null,
+    nullable:    false,
     transformer: decimalTransformer,
   })
-  pricePerKgMin: number | null = null;
+  pricePerUnit: number = 0;
 
-  @Column({
-    type:        'decimal',
-    precision:   12,
-    scale:       2,
-    nullable:    true,
-    default:     null,
-    transformer: decimalTransformer,
-  })
-  pricePerKgMax: number | null = null;
-
+  // Harga per kg — data sekunder untuk referensi internal.
+  // Dihitung dari: pricePerUnit / estimasi_berat_varietas.
   @Column({
     type:        'decimal',
     precision:   12,
@@ -88,41 +97,21 @@ export class MarketPriceEntity {
   })
   pricePerKgAvg: number | null = null;
 
-  @Column({
-    type:        'decimal',
-    precision:   12,
-    scale:       2,
-    nullable:    true,
-    default:     null,
-    transformer: decimalTransformer,
-  })
-  pricePerUnitMin: number | null = null;
-
-  @Column({
-    type:        'decimal',
-    precision:   12,
-    scale:       2,
-    nullable:    true,
-    default:     null,
-    transformer: decimalTransformer,
-  })
-  pricePerUnitMax: number | null = null;
-
-  // ── Context Metadata ─────────────────────────────────────────
-  @Column({ type: 'varchar', length: 200, nullable: true, default: null })
-  locationHint: string | null = null;
-
-  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
-  sellerType: string | null = null;
-
+  // ── Metadata Listing ─────────────────────────────────────────
+  // Referensi berat asli dari judul listing penjual.
+  // Contoh: "per buah ~2.5 kg (estimasi)", "per kg × 2 kg"
   @Column({ type: 'varchar', length: 200, nullable: false })
   weightReference: string = '';
 
+  // Catatan normalisasi harga dari extractor.
+  // Contoh: "Rp650.000/buah (berat estimasi 2.5 kg untuk D13)"
   @Column({ type: 'text', nullable: true, default: null })
   notes: string | null = null;
 
-  // Diubah dari float ke decimal(3,2) untuk presisi terjamin pada nilai 0.00–1.00
-  // (fix M3 dari analisis Phase 1)
+  // ── Quality Signal ───────────────────────────────────────────
+  // Skor kepercayaan extractor terhadap akurasi entry ini (0.00–1.00).
+  // Dipakai oleh view variety_price_avg untuk filter (confidence >= 0.70)
+  // agar data rendah kualitas tidak masuk rata-rata harga.
   @Column({
     type:        'decimal',
     precision:   3,
@@ -133,18 +122,16 @@ export class MarketPriceEntity {
   })
   confidence: number = 0.5;
 
-  @Column({ type: 'text', nullable: true, default: null })
-  rawTextSnippet: string | null = null;
-
   // ── Source Tracking ──────────────────────────────────────────
+  // Nama platform asal listing (contoh: "shopee.co.id", "tokopedia.com").
   @Column({ type: 'varchar', length: 255, nullable: false })
   sourceName: string = '';
 
+  // URL langsung ke halaman produk di Google Shopping.
   @Column({ type: 'varchar', length: 512, nullable: false })
   sourceUrl: string = '';
 
-  // agentVersion dipindahkan dari runId raw ke sini; tetap relevan
-  // untuk tracing versi scraper yang digunakan
+  // Versi Python agent yang menghasilkan entry ini — untuk tracing.
   @Column({ type: 'varchar', length: 20, nullable: false })
   agentVersion: string = '';
 
