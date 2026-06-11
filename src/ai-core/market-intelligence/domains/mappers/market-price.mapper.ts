@@ -1,46 +1,52 @@
 // src/ai-core/market-intelligence/domains/mappers/market-price.mapper.ts
 //
-// v3 Fix: toCreateData() menerima agentRunId sebagai parameter eksplisit
-// (sebelumnya tidak ada, sehingga agentRunId di entity kosong / tidak valid).
+// v4 Sinkron dengan entity & DTO v4:
+//   - MarketPriceResponseDto: hapus pricePerKgMin/Max, locationHint, sellerType.
+//     Tambah pricePerUnit sebagai field utama.
+//   - toCreateData(): tambah pricePerUnit dan pricePerKgAvg yang sebelumnya
+//     tidak diisi sama sekali (bug di v3).
+//   - toResponseDto(): sinkron dengan field entity v4.
 
-import { Injectable }                    from '@nestjs/common';
+import { Injectable }                       from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MarketPriceEntryDto }           from '../../applications/dto/market-price-entry.dto';
+import { MarketPriceEntryDto }              from '../../applications/dto/market-price-entry.dto';
 import { DurianVarietyCode, MarketPriceEntity } from '../entities/market-price.entity';
-import { CreateMarketPriceData }         from '../../infrastructures/repositories/market-price.repository.interface';
+import { CreateMarketPriceData }            from '../../infrastructures/repositories/market-price.repository.interface';
 
+// ── Response DTO untuk endpoint publik (card hasil scan, dll.) ───────────────
 export class MarketPriceResponseDto {
-  @ApiProperty({ description: 'UUID record harga.', example: '550e8400-...' })
+  @ApiProperty({ description: 'UUID record harga.', example: '550e8400-e29b-41d4-a716-446655440000' })
   id: string = '';
 
-  @ApiProperty({ enum: DurianVarietyCode, description: 'Kode varietas DOA Malaysia.' })
+  @ApiProperty({ enum: DurianVarietyCode, description: 'Kode varietas DOA Malaysia.', example: 'D197' })
   varietyCode: string = '';
 
-  @ApiProperty({ description: 'Nama alias produk dari sumber data.', example: 'Musang King' })
+  @ApiProperty({ description: 'Nama standar varietas.', example: 'Musang King' })
   varietyAlias: string = '';
 
-  @ApiPropertyOptional({ description: 'Harga minimum per Kg (IDR).', nullable: true })
-  pricePerKgMin: number | null = null;
+  @ApiProperty({
+    description: 'Harga per buah utuh (IDR). Satu titik harga dari satu listing.',
+    example:     1950000,
+  })
+  pricePerUnit: number = 0;
 
-  @ApiPropertyOptional({ description: 'Harga maksimum per Kg (IDR).', nullable: true })
-  pricePerKgMax: number | null = null;
-
-  @ApiPropertyOptional({ description: 'Harga rata-rata per Kg (IDR).', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Harga per kg (IDR) — data sekunder, dihitung dari pricePerUnit / estimasi berat.',
+    example:     975000,
+    nullable:    true,
+  })
   pricePerKgAvg: number | null = null;
 
-  @ApiPropertyOptional({ description: 'Lokasi dari sumber data.', nullable: true })
-  locationHint: string | null = null;
-
-  @ApiPropertyOptional({ description: 'Jenis penjual.', nullable: true })
-  sellerType: string | null = null;
-
-  @ApiProperty({ description: 'Referensi berat asli dari listing.' })
+  @ApiProperty({ description: 'Referensi berat asli dari listing.', example: 'per buah ~2 kg (estimasi)' })
   weightReference: string = '';
 
-  @ApiProperty({ description: 'Skor kepercayaan LLM (0–1).', minimum: 0, maximum: 1 })
+  @ApiPropertyOptional({ description: 'Catatan normalisasi harga.', nullable: true })
+  notes: string | null = null;
+
+  @ApiProperty({ description: 'Skor kepercayaan extractor (0–1).', minimum: 0, maximum: 1, example: 0.80 })
   confidence: number = 0;
 
-  @ApiProperty({ description: 'Nama sumber data.' })
+  @ApiProperty({ description: 'Nama platform sumber data.', example: 'shopee.co.id' })
   sourceName: string = '';
 
   @ApiProperty({ description: 'Waktu record dibuat.', format: 'date-time' })
@@ -53,28 +59,30 @@ export class MarketPriceMapper {
    * Konversi DTO → data untuk repository.bulkCreate().
    *
    * @param entry        - Validated DTO dari Python agent
-   * @param sourceName   - Nama sumber (e.g. "market-intelligence-agent")
-   * @param sourceUrl    - URL sumber (e.g. "internal" atau URL produk)
-   * @param agentVersion - Versi agent / run_id
-   * @param agentRunId   - UUID AgentRunEntity yang sudah dibuat (FK wajib)
+   * @param sourceName   - Nama platform (e.g. "shopee.co.id")
+   * @param sourceUrl    - URL produk Google Shopping
+   * @param agentVersion - Versi Python agent
+   * @param agentRunId   - UUID AgentRunEntity (FK wajib)
    */
   toCreateData(
     entry:        MarketPriceEntryDto,
     sourceName:   string,
     sourceUrl:    string,
     agentVersion: string,
-    agentRunId:   string,  // ← BARU: wajib ada untuk FK
+    agentRunId:   string,
   ): CreateMarketPriceData {
     return {
       agentRunId,
       varietyCode:     entry.variety_code,
       varietyAlias:    entry.variety_alias.trim(),
+      pricePerUnit:    entry.price_per_unit,
+      pricePerKgAvg:   entry.price_per_kg_avg ?? null,
       weightReference: entry.weight_reference.trim(),
-      notes:           entry.notes,
+      notes:           entry.notes ?? null,
       confidence:      entry.confidence,
-      sourceName:      sourceName,
-      sourceUrl:       sourceUrl,
-      agentVersion:    agentVersion,
+      sourceName,
+      sourceUrl,
+      agentVersion,
     };
   }
 
@@ -83,8 +91,10 @@ export class MarketPriceMapper {
       id:              entity.id,
       varietyCode:     entity.varietyCode,
       varietyAlias:    entity.varietyAlias,
+      pricePerUnit:    entity.pricePerUnit,
       pricePerKgAvg:   entity.pricePerKgAvg,
       weightReference: entity.weightReference,
+      notes:           entity.notes,
       confidence:      entity.confidence,
       sourceName:      entity.sourceName,
       createdAt:       entity.createdAt,

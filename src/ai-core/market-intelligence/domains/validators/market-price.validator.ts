@@ -1,22 +1,23 @@
 // src/ai-core/market-intelligence/domains/validators/market-price.validator.ts
 //
-// Perubahan dari versi sebelumnya:
-//   - Tambah IQR outlier detection pada price_per_unit per run
-//     sehingga listing ekstrem tidak masuk ke rata-rata akhir.
-//   - filterWholeAndValid() sekarang menerima seluruh batch entries
-//     agar IQR bisa dihitung sebelum memfilter.
+// v4 Sinkron dengan DTO v4:
+//   - _basicRejectionReason(): hapus cek price_per_kg_min/max, price_per_unit_min/max.
+//     Sekarang cek satu field: price_per_unit (wajib > 0).
+//   - IQR outlier detection: baca dari e.price_per_unit (bukan min ?? max lagi).
+//   - assertAtLeastOnePrice(): dihapus — tidak relevan lagi karena price_per_unit
+//     sekarang @IsNumber() @Min(0) @IsNotEmpty() di DTO, validasi sudah di layer DTO.
 
-import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { MarketPriceEntryDto } from '../../applications/dto/market-price-entry.dto';
-import { DurianVarietyCode } from '../entities/market-price.entity';
+import { DurianVarietyCode }   from '../entities/market-price.entity';
 
 const VALID_VARIETY_CODES = new Set<string>(Object.values(DurianVarietyCode));
 
-// Rentang IQR: entry di luar median ± IQR_MULTIPLIER × IQR dibuang
+// Entry di luar Q1 - MULTIPLIER×IQR atau Q3 + MULTIPLIER×IQR dibuang.
 const IQR_MULTIPLIER = 1.5;
 
-// Minimum entry per varietas agar IQR bisa bermakna.
-// Jika kurang dari ini, skip outlier detection (simpan semua yang lolos filter dasar).
+// Minimum entry per varietas agar IQR bermakna.
+// Di bawah angka ini, semua entry yang lolos filter dasar langsung disimpan.
 const IQR_MIN_SAMPLE = 3;
 
 @Injectable()
@@ -28,7 +29,7 @@ export class MarketPriceValidator {
     runId:   string,
   ): { valid: MarketPriceEntryDto[]; rejectedCount: number } {
 
-    // ── Pass 1: filter dasar (is_whole_fruit, variety_code, ada harga) ──────
+    // ── Pass 1: filter dasar ─────────────────────────────────────────────────
     const pass1: MarketPriceEntryDto[] = [];
     let rejectedCount = 0;
 
@@ -37,8 +38,8 @@ export class MarketPriceValidator {
       if (reason !== null) {
         this.logger.warn(
           `[Validator] Entry ditolak (basic) — run_id=${runId}, ` +
-            `variety=${entry.variety_code}, alias='${entry.variety_alias}', ` +
-            `reason=${reason}`,
+          `variety=${entry.variety_code}, alias='${entry.variety_alias}', ` +
+          `reason=${reason}`,
         );
         rejectedCount++;
       } else {
@@ -49,7 +50,6 @@ export class MarketPriceValidator {
     // ── Pass 2: IQR outlier detection per varietas ───────────────────────────
     const valid: MarketPriceEntryDto[] = [];
 
-    // Kelompokkan per variety_code
     const grouped = new Map<string, MarketPriceEntryDto[]>();
     for (const entry of pass1) {
       const vc = entry.variety_code;
@@ -58,13 +58,9 @@ export class MarketPriceValidator {
     }
 
     for (const [vc, group] of grouped) {
-      // Ambil semua harga per-buah yang tersedia
-      const prices = group
-        .map(e => e.price_per_unit_min ?? e.price_per_unit_max ?? null)
-        .filter((p): p is number => p !== null);
+      const prices = group.map(e => e.price_per_unit);
 
       if (prices.length < IQR_MIN_SAMPLE) {
-        // Terlalu sedikit sampel — tidak bisa deteksi outlier, simpan semua
         this.logger.debug(
           `[Validator] ${vc}: hanya ${prices.length} sampel, skip IQR detection.`,
         );
@@ -74,25 +70,22 @@ export class MarketPriceValidator {
 
       const { lowerFence, upperFence } = this._iqrFences(prices);
       this.logger.debug(
-        `[Validator] ${vc}: IQR fence Rp${Math.round(lowerFence).toLocaleString()} – ` +
-          `Rp${Math.round(upperFence).toLocaleString()} (${prices.length} sampel)`,
+        `[Validator] ${vc}: IQR fence ` +
+        `Rp${Math.round(lowerFence).toLocaleString('id-ID')} – ` +
+        `Rp${Math.round(upperFence).toLocaleString('id-ID')} ` +
+        `(${prices.length} sampel)`,
       );
 
       for (const entry of group) {
-        const unitPrice = entry.price_per_unit_min ?? entry.price_per_unit_max ?? null;
+        const price = entry.price_per_unit;
 
-        if (unitPrice === null) {
-          // Tidak punya harga per-buah sama sekali — sudah lolos pass1,
-          // tapi tidak bisa di-IQR-check. Simpan.
-          valid.push(entry);
-          continue;
-        }
-
-        if (unitPrice < lowerFence || unitPrice > upperFence) {
+        if (price < lowerFence || price > upperFence) {
           this.logger.warn(
             `[Validator] Entry ditolak (IQR outlier) — run_id=${runId}, ` +
-              `variety=${vc}, price_per_unit=Rp${Math.round(unitPrice).toLocaleString()}, ` +
-              `fence=[${Math.round(lowerFence).toLocaleString()}, ${Math.round(upperFence).toLocaleString()}]`,
+            `variety=${vc}, ` +
+            `price_per_unit=Rp${Math.round(price).toLocaleString('id-ID')}, ` +
+            `fence=[${Math.round(lowerFence).toLocaleString('id-ID')}, ` +
+            `${Math.round(upperFence).toLocaleString('id-ID')}]`,
           );
           rejectedCount++;
         } else {
@@ -111,41 +104,31 @@ export class MarketPriceValidator {
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private _basicRejectionReason(entry: MarketPriceEntryDto): string | null {
+    // 1. Wajib buah utuh
     if (!entry.is_whole_fruit) {
       return 'is_whole_fruit=false';
     }
 
+    // 2. Kode varietas harus dikenal
     const normalizedCode = entry.variety_code?.toString().trim().toUpperCase();
     if (!normalizedCode || !VALID_VARIETY_CODES.has(normalizedCode)) {
       return `variety_code tidak dikenal: '${entry.variety_code}'`;
     }
 
-    const prices = [
-      entry.price_per_kg_min,
-      entry.price_per_kg_max,
-      entry.price_per_kg_avg,
-      entry.price_per_unit_min,
-      entry.price_per_unit_max,
-    ];
-    const hasPrice = prices.some(p => p !== null && p !== undefined && p >= 0);
-    if (!hasPrice) {
-      return 'semua field harga null';
+    // 3. Harga per buah wajib ada dan positif
+    // price_per_unit sudah @Min(0) di DTO, tapi 0 tidak valid sebagai harga listing
+    if (entry.price_per_unit <= 0) {
+      return `price_per_unit tidak valid: ${entry.price_per_unit}`;
     }
 
     return null;
   }
 
-  /**
-   * Hitung lower dan upper fence IQR dari array harga.
-   * Lower fence = Q1 - multiplier × IQR
-   * Upper fence = Q3 + multiplier × IQR
-   */
   private _iqrFences(prices: number[]): { lowerFence: number; upperFence: number } {
     const sorted = [...prices].sort((a, b) => a - b);
-    const n      = sorted.length;
 
-    const q1 = this._percentile(sorted, 0.25);
-    const q3 = this._percentile(sorted, 0.75);
+    const q1  = this._percentile(sorted, 0.25);
+    const q3  = this._percentile(sorted, 0.75);
     const iqr = q3 - q1;
 
     return {
@@ -160,20 +143,5 @@ export class MarketPriceValidator {
     const hi   = Math.ceil(idx);
     const frac = idx - lo;
     return sorted[lo] + frac * (sorted[hi] - sorted[lo]);
-  }
-
-  assertAtLeastOnePrice(entry: MarketPriceEntryDto): void {
-    const prices = [
-      entry.price_per_kg_min,
-      entry.price_per_kg_max,
-      entry.price_per_kg_avg,
-      entry.price_per_unit_min,
-      entry.price_per_unit_max,
-    ];
-    if (!prices.some(p => p !== null && p !== undefined)) {
-      throw new UnprocessableEntityException(
-        `Entry variety='${entry.variety_code}' tidak memiliki field harga yang terisi.`,
-      );
-    }
   }
 }
