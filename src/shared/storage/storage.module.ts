@@ -11,6 +11,9 @@ import { StoredFileEntity } from './domains/entities/stored-file.entity';
 import { LocalStorageAdapter } from './infrastructures/adapters/local-storage.adapter';
 import { S3StorageAdapter } from './infrastructures/adapters/s3-storage.adapter';
 import { StorageAdapterProvider } from './infrastructures/providers/storage-adapter.provider';
+import {
+  STORAGE_ADAPTER_TOKEN,
+} from './infrastructures/adapters/storage.adapter.interface';
 
 // Repository
 import { StoredFileRepository } from './infrastructures/repositories/stored-file.repository';
@@ -99,8 +102,12 @@ import { AuthModule } from '../../identity/auth/auth.module';
     // Di-export agar PredictionModule bisa memanggil UploadFileUseCase
     // langsung dari dalam CreatePredictionUseCase (1 request = upload + predict)
     STORED_FILE_REPOSITORY_TOKEN,
+    StorageAdapterProvider,
+    STORAGE_ADAPTER_TOKEN,
     StorageOrchestrator,
     StorageDomainService,
+    LocalStorageAdapter,
+    S3StorageAdapter,
     UploadFileUseCase,
     DeleteFileUseCase,
   ],

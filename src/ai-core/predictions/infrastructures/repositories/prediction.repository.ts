@@ -133,4 +133,11 @@ export class PredictionRepository implements IPredictionRepository {
       );
     }
   }
+
+  async findByStatus(status: string): Promise<PredictionEntity[]> {
+    return this.ormRepo.find({
+      where: { status: status as PredictionStatus },
+      order: { createdAt: 'DESC' },
+    });
+  }
 }

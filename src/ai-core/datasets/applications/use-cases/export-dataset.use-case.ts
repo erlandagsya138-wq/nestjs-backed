@@ -13,12 +13,11 @@
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import * as archiver from 'archiver';
-import * as https from 'https';
-import * as http from 'http';
 import { Writable, PassThrough } from 'stream';
 import { DatasetResponseDto } from '../dto/dataset.dto';
 import { DatasetMapper } from '../../domains/mappers/dataset.mapper';
 import { DatasetValidator } from '../../domains/validators/dataset.validator';
+import { DatasetDomainService } from '../../domains/services/dataset-domain.service';
 import { DatasetExportFormat, DatasetStatus } from '../../domains/entities/dataset.entity';
 import {
   DATASET_REPOSITORY_TOKEN,
@@ -28,7 +27,11 @@ import {
   type IPredictionRepository,
   PREDICTION_REPOSITORY_TOKEN,
 } from '../../../predictions/infrastructures/repositories/prediction.repository.interface';
-import { LocalStorageAdapter } from '../../../../shared/storage/infrastructures/adapters/local-storage.adapter';
+import {
+  type IStorageAdapter,
+  STORAGE_ADAPTER_TOKEN,
+} from '../../../../shared/storage/infrastructures/adapters/storage.adapter.interface';
+import { RawUploadedFile } from '../../../../shared/storage/domains/entities/stored-file.entity';
 
 // Record entry yang masuk ke file metadata dataset
 interface DatasetExportRecord {
@@ -52,9 +55,11 @@ export class ExportDatasetUseCase {
     private readonly datasetRepo: IDatasetRepository,
     @Inject(PREDICTION_REPOSITORY_TOKEN)
     private readonly predictionRepo: IPredictionRepository,
+    @Inject(STORAGE_ADAPTER_TOKEN)
+    private readonly storageAdapter: IStorageAdapter,
     private readonly validator: DatasetValidator,
     private readonly mapper: DatasetMapper,
-    private readonly storageAdapter: LocalStorageAdapter,
+    private readonly domainService: DatasetDomainService,
   ) {}
 
   async execute(datasetId: string): Promise<DatasetResponseDto> {
@@ -83,9 +88,7 @@ export class ExportDatasetUseCase {
 
         const confidenceTier =
           prediction.confidenceScore !== null
-            ? this.mapper['domainService'].classifyConfidence(
-                prediction.confidenceScore,
-              )
+            ? this.domainService.classifyConfidence(prediction.confidenceScore)
             : null;
 
         records.push({
@@ -110,15 +113,20 @@ export class ExportDatasetUseCase {
 
       // ── 5. Upload ke storage ─────────────────────────────────────────────
       const exportFileName = `datasets/${datasetId}/export-${Date.now()}.zip`;
-      const exportUrl = await this.storageAdapter.uploadBuffer(
-        zipBuffer,
-        exportFileName,
-        'application/zip',
-      );
+
+      const rawFile: RawUploadedFile = Object.assign(new RawUploadedFile(), {
+        buffer:       zipBuffer,
+        originalName: `export-${datasetId}.zip`,
+        mimeType:     'application/zip',
+        sizeInBytes:  zipBuffer.length,
+      });
+
+      const uploadResult = await this.storageAdapter.upload(rawFile, exportFileName);
+      const exportUrl    = uploadResult.imageUrl;
 
       // ── 6. Set READY ─────────────────────────────────────────────────────
       const updated = await this.datasetRepo.updateStatus(datasetId, {
-        status: DatasetStatus.READY ,
+        status: DatasetStatus.READY,
         exportUrl,
         exportedAt: new Date(),
       });
@@ -148,8 +156,8 @@ export class ExportDatasetUseCase {
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private async _buildZip(
-    format:      DatasetExportFormat,
-    records:     DatasetExportRecord[],
+    format:        DatasetExportFormat,
+    records:       DatasetExportRecord[],
     predictionIds: string[],
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
@@ -176,7 +184,7 @@ export class ExportDatasetUseCase {
 
       // Placeholder untuk gambar — fetch async dilakukan terpisah
       // Untuk simplisitas capstone: include URL list sebagai manifest
-      const manifest = predictionIds.map((id) => id).join('\n');
+      const manifest = predictionIds.join('\n');
       archive.append(manifest, { name: 'image_manifest.txt' });
 
       void archive.finalize();

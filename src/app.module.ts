@@ -19,6 +19,7 @@ import { StorageModule } from './shared/storage/storage.module';
 import { AiIntegrationModule } from './ai-core/ai-integration/ai-integration.module';
 // [FIX BUG-05] Import MarketIntelligenceModule agar endpoint /api/v1/ai-integration/market-report terdaftar
 import { MarketIntelligenceModule } from './ai-core/market-intelligence/market-intelligence.module';
+import { DatasetModule }           from './ai-core/datasets/dataset.module';
 
 // ── Guards ────────────────────────────────────────────────────
 import { JwtAuthGuard } from './identity/auth/interface/guards/jwt-auth.guard';
@@ -27,7 +28,9 @@ import { StoredFileEntity } from './shared/storage/domains/entities/stored-file.
 import { UserEntity } from './identity/users/domains/entities/user.entity';
 import { PredictionEntity } from './ai-core/predictions/domains/entities/prediction.entity';
 import { MarketPriceEntity } from './ai-core/market-intelligence/domains/entities/market-price.entity';
-import { AgentRunEntity } from './ai-core/market-intelligence/domains/entities/agent-run.entity';
+import { AgentRunEntity }    from './ai-core/market-intelligence/domains/entities/agent-run.entity';
+import { DatasetEntity }     from './ai-core/datasets/domains/entities/dataset.entity';
+import { DatasetItemEntity } from './ai-core/datasets/domains/entities/dataset-item.entity';
 
 @Module({
   imports: [
@@ -90,7 +93,15 @@ import { AgentRunEntity } from './ai-core/market-intelligence/domains/entities/a
           username: config.getOrThrow<string>('DB_USERNAME'),
           password: config.getOrThrow<string>('DB_PASSWORD'),
           database: config.getOrThrow<string>('DB_DATABASE'),
-          entities: [UserEntity, PredictionEntity, MarketPriceEntity, StoredFileEntity, AgentRunEntity],
+          entities: [
+            UserEntity,
+            PredictionEntity,
+            MarketPriceEntity,
+            StoredFileEntity,
+            AgentRunEntity,
+            DatasetEntity,
+            DatasetItemEntity,
+          ],
           synchronize: isSynchronizeEnabled,
           logging: nodeEnv === 'development' ? ['query', 'error'] : ['error'],
           timezone: '+07:00',
@@ -114,6 +125,7 @@ import { AgentRunEntity } from './ai-core/market-intelligence/domains/entities/a
     PredictionModule,
     AiIntegrationModule,
     MarketIntelligenceModule,
+    DatasetModule,
   ],
 
   providers: [
