@@ -6,6 +6,7 @@
 //   - Rename pricePerUnitMin → pricePerUnit.
 //   - VarietyPriceAverage: field disesuaikan untuk card hasil scan.
 
+import { SelectQueryBuilder } from 'typeorm';
 import { DurianVarietyCode, MarketPriceEntity } from '../../domains/entities/market-price.entity';
 
 export interface CreateMarketPriceData {
@@ -66,6 +67,7 @@ export interface IMarketPriceRepository {
 
   findByRunId(runId: string): Promise<MarketPriceEntity[]>;
   findByVarietyCode(varietyCode: string, limit: number): Promise<MarketPriceEntity[]>;
+  createQueryBuilder(alias: string): SelectQueryBuilder<MarketPriceEntity>;
 }
 
 export const MARKET_PRICE_REPOSITORY_TOKEN = Symbol('IMarketPriceRepository');

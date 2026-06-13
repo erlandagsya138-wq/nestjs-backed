@@ -14,6 +14,20 @@ export class VarietyScoreResponseDto {
   confidenceScore: number = 0;
 }
 
+export class MarketPriceSummaryDto {
+  @ApiProperty({ example: 400000 })
+  minPriceKg: number = 0;
+
+  @ApiProperty({ example: 700000 })
+  maxPriceKg: number = 0;
+
+  @ApiProperty({ example: 550000 })
+  avgPriceKg: number = 0;
+
+  @ApiProperty({ example: 12 })
+  totalListings: number = 0;
+}
+
 export class PredictionResponseDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000', description: 'UUID prediksi' })
   id: string = '';
@@ -86,6 +100,13 @@ export class PredictionResponseDto {
     nullable:    true,
   })
   aiRequestId: string | null = null;
+
+  @ApiPropertyOptional({
+    type: MarketPriceSummaryDto,
+    description: 'Ringkasan harga pasar untuk varietas ini (jika tersedia)',
+    nullable: true,
+  })
+  marketPriceSummary?: MarketPriceSummaryDto | null = null;
 }
 
 export class PaginatedPredictionResponseDto {

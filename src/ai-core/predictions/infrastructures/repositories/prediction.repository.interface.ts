@@ -8,10 +8,10 @@ export interface VarietyScoreData {
 }
 
 export interface PredictionResultPayload {
-  varietyCode:     string;
+  varietyCode:     string | null;
   varietyName:     string;
   localName:       string;
-  origin:          string;
+  origin:          string | null;
   description:     string;
   confidenceScore: number;
   imageEnhanced:   boolean;

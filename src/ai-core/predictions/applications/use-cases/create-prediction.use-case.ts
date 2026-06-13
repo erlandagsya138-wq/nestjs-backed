@@ -18,6 +18,7 @@ import { AiIntegrationDomainService } from '../../../ai-integration/domains/serv
 import { AiHealthService } from '../../../ai-integration/infrastructures/health/ai-health.service';
 import { UploadFileUseCase } from '../../../../shared/storage/applications/use-cases/upload-file.use-case';
 import type { IUploadedFile } from '../../../../shared/storage/domains/mappers/storage.mapper';
+import { MarketIntelligenceOrchestrator } from '../../../market-intelligence/applications/orchestrator/market-intelligence.orchestrator';
 
 @Injectable()
 export class CreatePredictionUseCase {
@@ -30,10 +31,9 @@ export class CreatePredictionUseCase {
     private readonly mapper:       PredictionMapper,
     private readonly eventEmitter: EventEmitter2,
 
-    // UploadFileUseCase di-inject agar upload + persist StoredFileEntity
-    // terjadi di dalam 1 alur yang sama dengan pembuatan prediction.
-    // StorageModule harus di-import di PredictionModule (lihat prediction.module.ts)
     private readonly uploadFileUseCase: UploadFileUseCase,
+    
+    private readonly marketIntelligenceOrchestrator: MarketIntelligenceOrchestrator,
 
     @Inject(forwardRef(() => AiIntegrationOrchestrator))
     private readonly aiOrchestrator: AiIntegrationOrchestrator,
@@ -43,19 +43,9 @@ export class CreatePredictionUseCase {
 
     @Inject(forwardRef(() => AiHealthService))
     private readonly aiHealthService: AiHealthService,
+
   ) {}
 
-  /**
-   * Execute menerima IUploadedFile (Multer file object) langsung dari controller.
-   * Tidak ada lagi imageUrl di request body — file diterima sebagai multipart.
-   *
-   * Alur:
-   *   1. Guard: validasi userId & AI status
-   *   2. Upload file → StoredFileEntity di-persist → dapat storedFileId & imageUrl
-   *   3. Buat PredictionEntity PENDING dengan storedFileId
-   *   4. Kirim buffer ke AI
-   *   5. Return hasil akhir
-   */
   async execute(
     file:                IUploadedFile,
     authenticatedUserId: string,
@@ -160,11 +150,22 @@ export class CreatePredictionUseCase {
       );
     }
 
+    const responseDto = this.mapper.toResponseDto(final);
+
+    if(final.status === 'SUCCESS' && final.varietyCode) {
+      try {
+        const priceSummary = await this.marketIntelligenceOrchestrator.getPriceSummaryByVariety(final.varietyCode);
+        responseDto.marketPriceSummary = priceSummary;
+      } catch (error) {
+        this.logger.error(`Gagal mengambil harga pasar untuk ${final.varietyCode}`, error);
+      }
+    }
+
     this.logger.log(
       `[Create] DONE → id=${final.id}, status=${final.status}, ` +
       `variety=${final.varietyCode ?? 'N/A'}`,
     );
 
-    return this.mapper.toResponseDto(final);
+    return responseDto;
   }
 }

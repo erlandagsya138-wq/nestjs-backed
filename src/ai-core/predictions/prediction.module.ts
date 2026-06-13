@@ -20,6 +20,7 @@ import { AiIntegrationModule } from '../ai-integration/ai-integration.module';
 // ke CreatePredictionUseCase. Ini memungkinkan 1 request POST /predictions
 // menjalankan upload + predict secara sequential dalam satu transaksi logis.
 import { StorageModule } from '../../shared/storage/storage.module';
+import { MarketIntelligenceModule } from '../market-intelligence/market-intelligence.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { StorageModule } from '../../shared/storage/storage.module';
     // StorageModule menyediakan: UploadFileUseCase, StorageDomainService,
     // StorageAdapterProvider, dan StoredFileRepository
     StorageModule,
+    MarketIntelligenceModule,
   ],
   controllers: [PredictionController],
   providers: [

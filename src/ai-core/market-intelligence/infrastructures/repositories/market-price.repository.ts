@@ -5,7 +5,7 @@
 
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, SelectQueryBuilder } from 'typeorm';
 import { MarketPriceEntity } from '../../domains/entities/market-price.entity';
 import {
   CreateMarketPriceData,
@@ -23,6 +23,10 @@ export class MarketPriceRepository implements IMarketPriceRepository {
 
     private readonly dataSource: DataSource,
   ) {}
+
+  createQueryBuilder(alias: string): SelectQueryBuilder<MarketPriceEntity> {
+    return this.ormRepo.createQueryBuilder(alias);
+  }
 
   async bulkCreate(data: CreateMarketPriceData[]): Promise<MarketPriceEntity[]> {
     if (data.length === 0) return [];

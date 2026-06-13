@@ -15,6 +15,7 @@ import {
 @Injectable()
 export class ProcessPredictionUseCase {
   private readonly logger = new Logger(ProcessPredictionUseCase.name);
+  private readonly MINIMUM_CONFIDENCE_THRESHOLD = 0.80;
 
   constructor(
     @Inject(AI_HTTP_ADAPTER_TOKEN)
@@ -55,7 +56,23 @@ export class ProcessPredictionUseCase {
       this.validator.assertValidResult(rawResult);
 
       // ── Step 3: Map ke payload repository ───────────────────────────────
-      const payload = this.mapper.toPredictionResultPayload(rawResult);
+      let payload = this.mapper.toPredictionResultPayload(rawResult);
+
+      if (payload.confidenceScore !== null && payload.confidenceScore < this.MINIMUM_CONFIDENCE_THRESHOLD) {
+        this.logger.warn(
+          `[ProcessPrediction] Confidence (${payload.confidenceScore}) di bawah standar (${this.MINIMUM_CONFIDENCE_THRESHOLD}). Menyamarkan hasil.`
+        );
+        
+        payload = {
+          ...payload,
+          varietyCode: null,
+          varietyName: 'TIdak Dikenali',
+          localName: 'Tidak Dikenali',
+          origin: null,
+          description: 'Sistem AI berhasil memproses gambar, namun tingkat keyakinan terlalu rendah. Harap pastikan pencahayaan cukup dan kamera fokus pada buah durian secara utuh.',
+          allVarieties: [],
+        }
+      }
 
       // ── Step 4: Update prediction record → SUCCESS ───────────────────────
       await this.predictionRepo.updateResult(predictionId, payload);
