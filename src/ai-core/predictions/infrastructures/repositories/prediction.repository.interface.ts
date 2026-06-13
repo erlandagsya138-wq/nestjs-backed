@@ -43,6 +43,7 @@ export interface IPredictionRepository {
   create(data: CreatePredictionData): Promise<PredictionEntity>;
   updateResult(id: string, result: PredictionResultPayload): Promise<PredictionEntity>;
   markAsFailed(id: string, reason: string): Promise<void>;
+  findByStatus(status: string): Promise<PredictionEntity[]>;
 }
 
 export const PREDICTION_REPOSITORY_TOKEN = Symbol('IPredictionRepository');
