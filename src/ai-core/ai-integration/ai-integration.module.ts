@@ -13,14 +13,6 @@ import { AiResponseValidator } from './domains/validators/ai-response.validator'
 import { AiResponseMapper } from './domains/mappers/ai-response.mapper';
 import { ProcessPredictionUseCase } from './applications/use-cases/process-prediction.use-case';
 import { AiIntegrationOrchestrator } from './applications/orchestrator/ai-integration.orchestrator';
-// [FIX BUG-07] Import AiPredictionCreatedListener yang sebelumnya tidak terdaftar
-// File ada di infrastructures/listeners/ tapi tidak pernah di-provide ke NestJS DI container
-// Akibat: listener tidak aktif, event 'prediction.created' tidak pernah diproses oleh listener ini
-//
-// CATATAN ARSITEKTUR: Listener ini dipertahankan sebagai observer passif untuk
-// logging/monitoring. Pemrosesan AI utama tetap dilakukan secara SYNC di
-// CreatePredictionUseCase.execute() → aiOrchestrator.process().
-// Listener TIDAK memanggil aiOrchestrator lagi untuk menghindari double processing.
 import { AiPredictionCreatedListener } from './infrastructures/listeners/prediction-created.listener';
 
 import { PredictionModule } from '../predictions/prediction.module';

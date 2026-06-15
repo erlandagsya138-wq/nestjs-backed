@@ -1,18 +1,8 @@
-// src/ai-integration/domains/validators/ai-response.validator.ts
+// src/ai-core/ai-integration/domains/validators/ai-response.validator.ts
+
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { AiPredictResultDto } from '../../applications/dto/ai-predict-response.dto';
-
-/**
- * Kode varietas valid sesuai CLASS_NAMES di capstone-ai (.env):
- * D101, D13, D197, D2, D200, D24
- */
-const VALID_VARIETY_CODES = new Set<string>([
-  'D13',
-  'D197',
-  'D2',
-  'D200',
-  'D24',
-]);
+import { VALID_VARIETY_CODES } from '../constants/variety.constants';
 
 @Injectable()
 export class AiResponseValidator {

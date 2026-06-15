@@ -1,5 +1,11 @@
-// src/ai-integration/applications/use-cases/process-prediction.use-case.ts
-import { Inject, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+// src/ai-core/ai-integration/applications/use-cases/process-prediction.use-case.ts
+import {
+  Inject,
+  Injectable,
+  Logger,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AiPredictRequestDto } from '../dto/ai-predict-request.dto';
 import { AiResponseMapper } from '../../domains/mappers/ai-response.mapper';
 import { AiResponseValidator } from '../../domains/validators/ai-response.validator';
@@ -12,10 +18,15 @@ import {
   PREDICTION_REPOSITORY_TOKEN,
 } from '../../../predictions/infrastructures/repositories/prediction.repository.interface';
 
+const LOW_CONFIDENCE_DESCRIPTION =
+  'Sistem AI berhasil memproses gambar, namun tingkat keyakinan terlalu rendah. ' +
+  'Harap pastikan pencahayaan cukup dan kamera fokus pada buah durian secara utuh.';
+
 @Injectable()
 export class ProcessPredictionUseCase {
   private readonly logger = new Logger(ProcessPredictionUseCase.name);
-  private readonly MINIMUM_CONFIDENCE_THRESHOLD = 0.80;
+
+  private readonly MINIMUM_CONFIDENCE_THRESHOLD: number;
 
   constructor(
     @Inject(AI_HTTP_ADAPTER_TOKEN)
@@ -26,7 +37,11 @@ export class ProcessPredictionUseCase {
 
     private readonly validator: AiResponseValidator,
     private readonly mapper:    AiResponseMapper,
-  ) {}
+    private readonly config:    ConfigService,
+  ) {
+    this.MINIMUM_CONFIDENCE_THRESHOLD =
+      this.config.get<number>('AI_CONFIDENCE_THRESHOLD') ?? 0.80;
+  }
 
   async execute(request: AiPredictRequestDto): Promise<void> {
     const { predictionId } = request;
@@ -56,25 +71,27 @@ export class ProcessPredictionUseCase {
       this.validator.assertValidResult(rawResult);
 
       // ── Step 3: Map ke payload repository ───────────────────────────────
-      let payload = this.mapper.toPredictionResultPayload(rawResult);
+      const payload = this.mapper.toPredictionResultPayload(rawResult);
 
-      if (payload.confidenceScore !== null && payload.confidenceScore < this.MINIMUM_CONFIDENCE_THRESHOLD) {
+      // ── Step 4: Terapkan threshold confidence ────────────────────────────
+      if (
+        payload.confidenceScore !== null &&
+        payload.confidenceScore < this.MINIMUM_CONFIDENCE_THRESHOLD
+      ) {
         this.logger.warn(
-          `[ProcessPrediction] Confidence (${payload.confidenceScore}) di bawah standar (${this.MINIMUM_CONFIDENCE_THRESHOLD}). Menyamarkan hasil.`
+          `[ProcessPrediction] Confidence (${payload.confidenceScore}) di bawah standar ` +
+            `(${this.MINIMUM_CONFIDENCE_THRESHOLD}). Menyamarkan hasil.`,
         );
-        
-        payload = {
-          ...payload,
-          varietyCode: null,
-          varietyName: 'TIdak Dikenali',
-          localName: 'Tidak Dikenali',
-          origin: null,
-          description: 'Sistem AI berhasil memproses gambar, namun tingkat keyakinan terlalu rendah. Harap pastikan pencahayaan cukup dan kamera fokus pada buah durian secara utuh.',
-          allVarieties: [],
-        }
+
+        payload.varietyCode  = null;
+        payload.varietyName  = 'Tidak Dikenali';
+        payload.localName    = 'Tidak Dikenali';
+        payload.origin       = null;
+        payload.description  = LOW_CONFIDENCE_DESCRIPTION;
+        payload.allVarieties = [];
       }
 
-      // ── Step 4: Update prediction record → SUCCESS ───────────────────────
+      // ── Step 5: Update prediction record → SUCCESS ───────────────────────
       await this.predictionRepo.updateResult(predictionId, payload);
 
       this.logger.log(
@@ -91,7 +108,7 @@ export class ProcessPredictionUseCase {
 
       if (err instanceof UnprocessableEntityException) {
         this.logger.warn(
-          `[ProcessPrediction] FAILED → id=${predictionId}, reason=${reason}`
+          `[ProcessPrediction] FAILED → id=${predictionId}, reason=${reason}`,
         );
       } else {
         this.logger.error(

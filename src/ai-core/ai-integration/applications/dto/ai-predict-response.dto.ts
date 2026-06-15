@@ -45,9 +45,7 @@ export class AiPredictResultDto {
   imageEnhanced: boolean = false;
   inferenceTimeMs: number = 0;
   preprocessingTimeMs: number = 0;
-  // ── BARU: semua varietas dengan skornya ──
   allVarieties: VarietyScoreResultDto[] = [];
-  // ── BARU: metadata dari FastAPI ──
   modelVersion: string | null = null;
   aiRequestId: string | null = null;
 }
