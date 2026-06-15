@@ -16,7 +16,7 @@ export class AiIntegrationDomainService {
     'image/webp',
   ] as const;
 
-  readonly MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+  readonly MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
   isAllowedMimeType(
     mimeType: string,

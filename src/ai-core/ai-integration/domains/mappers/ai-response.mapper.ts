@@ -17,8 +17,7 @@ const VARIETY_NAME_MAP: Record<string, string> = {
   D2:   'Dato Nina',
   D13:  'D13',
   D24:  'Sultan',
-  D197: 'Musang King',
-  D200: 'D200',
+  D197: 'Musang King'
 };
 
 /**
