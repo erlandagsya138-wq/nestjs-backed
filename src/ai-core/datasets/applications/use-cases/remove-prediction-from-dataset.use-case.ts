@@ -25,6 +25,6 @@ export class RemovePredictionFromDatasetUseCase {
     this.validator.assertItemBelongsToDataset(item, datasetId);
 
     await this.datasetRepo.deleteItem(itemId);
-    await this.datasetRepo.decrementTotalItems(datasetId);
+    await this.datasetRepo.decrementTotalItems(datasetId, 1);
   }
 }

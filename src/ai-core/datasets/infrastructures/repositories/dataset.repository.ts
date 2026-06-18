@@ -12,6 +12,7 @@ import { DatasetItemEntity } from '../../domains/entities/dataset-item.entity';
 import {
   CreateDatasetData,
   CreateDatasetItemData,
+  DatasetItemWithPrediction,
   IDatasetRepository,
   ListDatasetsFilter,
   UpdateDatasetStatusData,
@@ -44,9 +45,7 @@ export class DatasetRepository implements IDatasetRepository {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`[DatasetRepository] create gagal: ${message}`);
-      throw new InternalServerErrorException(
-        `Gagal membuat dataset: ${message}`,
-      );
+      throw new InternalServerErrorException(`Gagal membuat dataset: ${message}`);
     }
   }
 
@@ -54,9 +53,7 @@ export class DatasetRepository implements IDatasetRepository {
     return this.datasetOrm.findOne({ where: { id } });
   }
 
-  async findAll(
-    filter: ListDatasetsFilter,
-  ): Promise<[DatasetEntity[], number]> {
+  async findAll(filter: ListDatasetsFilter): Promise<[DatasetEntity[], number]> {
     return this.datasetOrm.findAndCount({
       order: { createdAt: 'DESC' },
       skip:  filter.skip,
@@ -68,15 +65,16 @@ export class DatasetRepository implements IDatasetRepository {
     id:   string,
     data: UpdateDatasetStatusData,
   ): Promise<DatasetEntity> {
-    await this.datasetOrm.update(id, {
-      status:       data.status,
-      ...(data.exportUrl    !== undefined && { exportUrl:    data.exportUrl }),
-      ...(data.exportedAt   !== undefined && { exportedAt:   data.exportedAt }),
-      ...(data.errorMessage !== undefined && { errorMessage: data.errorMessage }),
-    });
+    const updatePayload: Partial<DatasetEntity> = { status: data.status };
+
+    if ('exportUrl' in data)    updatePayload.exportUrl    = data.exportUrl    ?? null;
+    if ('exportedAt' in data)   updatePayload.exportedAt   = data.exportedAt   ?? null;
+    if ('errorMessage' in data) updatePayload.errorMessage = data.errorMessage ?? null;
+
+    await this.datasetOrm.update(id, updatePayload);
 
     const updated = await this.findById(id);
-    if (!updated) {
+    if (updated === null) {
       throw new InternalServerErrorException(
         `Dataset id='${id}' tidak ditemukan setelah updateStatus.`,
       );
@@ -85,6 +83,7 @@ export class DatasetRepository implements IDatasetRepository {
   }
 
   async incrementTotalItems(id: string, by: number): Promise<void> {
+    if (by <= 0) return; // guard: tidak ada yang perlu di-increment
     await this.datasetOrm
       .createQueryBuilder()
       .update(DatasetEntity)
@@ -93,11 +92,12 @@ export class DatasetRepository implements IDatasetRepository {
       .execute();
   }
 
-  async decrementTotalItems(id: string): Promise<void> {
+  async decrementTotalItems(id: string, by: number = 1): Promise<void> {
+    if (by <= 0) return; // guard: tidak ada yang perlu di-decrement
     await this.datasetOrm
       .createQueryBuilder()
       .update(DatasetEntity)
-      .set({ totalItems: () => 'GREATEST(totalItems - 1, 0)' })
+      .set({ totalItems: () => `GREATEST(totalItems - ${by}, 0)` })
       .where('id = :id', { id })
       .execute();
   }
@@ -128,7 +128,7 @@ export class DatasetRepository implements IDatasetRepository {
     if (data.length === 0) return 0;
 
     try {
-      // INSERT IGNORE agar duplikat tidak throw error
+      // INSERT IGNORE agar duplikat tidak throw error (MySQL / MariaDB)
       const result = await this.dataSource
         .createQueryBuilder()
         .insert()
@@ -139,7 +139,7 @@ export class DatasetRepository implements IDatasetRepository {
             predictionId: d.predictionId,
           })),
         )
-        .orIgnore()  // MySQL: INSERT IGNORE
+        .orIgnore()
         .execute();
 
       return result.identifiers.length;
@@ -156,19 +156,28 @@ export class DatasetRepository implements IDatasetRepository {
     return this.itemOrm.findOne({ where: { id: itemId } });
   }
 
-  async findItemsByDatasetId(
-    datasetId: string,
-  ): Promise<DatasetItemEntity[]> {
+  async findItemsByDatasetId(datasetId: string): Promise<DatasetItemEntity[]> {
     return this.itemOrm.find({
       where: { datasetId },
       order: { addedAt: 'DESC' },
     });
   }
 
-  async itemExists(
-    datasetId:    string,
-    predictionId: string,
-  ): Promise<boolean> {
+  async findItemsWithPredictionsByDatasetId(
+    datasetId: string,
+  ): Promise<DatasetItemWithPrediction[]> {
+    const items = await this.itemOrm.find({
+      where:     { datasetId },
+      order:     { addedAt: 'DESC' },
+      relations: { prediction: true },
+    });
+
+    return items
+      .filter((item) => item.prediction != null)
+      .map((item) => ({ item, prediction: item.prediction }));
+  }
+
+  async itemExists(datasetId: string, predictionId: string): Promise<boolean> {
     const count = await this.itemOrm.count({
       where: { datasetId, predictionId },
     });

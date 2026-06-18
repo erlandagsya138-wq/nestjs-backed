@@ -2,15 +2,13 @@
 
 import { Injectable } from '@nestjs/common';
 import {
-  AddPredictionToDatasetDto,
-  BulkAddByConfidenceDto,
-  BulkAddResultDto,
-  CreateDatasetDto,
   DatasetItemResponseDto,
   DatasetResponseDto,
-  ListDatasetsQueryDto,
-  PaginatedDatasetResponseDto,
 } from '../dto/dataset.dto';
+import { CreateDatasetDto } from '../dto/create-dataset.dto';
+import { ListDatasetsQueryDto, PaginatedDatasetResponseDto } from '../dto/list-datasets-query.dto';
+import { AddPredictionToDatasetDto } from '../dto/add-prediction.dto';
+import { BulkAddByConfidenceDto, BulkAddResultDto } from '../dto/bulk-add.dto';
 import { CreateDatasetUseCase }               from '../use-cases/create-dataset.use-case';
 import { GetDatasetUseCase }                  from '../use-cases/get-dataset.use-case';
 import { AddPredictionToDatasetUseCase }      from '../use-cases/add-prediction-to-dataset.use-case';

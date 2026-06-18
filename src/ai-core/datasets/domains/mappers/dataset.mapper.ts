@@ -38,9 +38,14 @@ export class DatasetMapper {
     };
   }
 
+  /**
+   * Map dataset entity ke response DTO.
+   * @param items - null untuk list view (tidak memuat items/confidenceSummary),
+   *                array (boleh kosong) untuk detail view.
+   */
   toResponseDto(
     dataset: DatasetEntity,
-    items: DatasetItemResponseDto[] | null = null,
+    items: DatasetItemResponseDto[] | null,
   ): DatasetResponseDto {
     const confidenceSummary =
       items !== null
@@ -63,6 +68,7 @@ export class DatasetMapper {
     };
   }
 
+  /** Untuk list view — tidak memuat items maupun confidenceSummary. */
   toResponseDtoList(datasets: DatasetEntity[]): DatasetResponseDto[] {
     return datasets.map((d) => this.toResponseDto(d, null));
   }

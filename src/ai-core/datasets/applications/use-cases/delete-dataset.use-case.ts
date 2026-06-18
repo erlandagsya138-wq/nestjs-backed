@@ -18,7 +18,7 @@ export class DeleteDatasetUseCase {
   async execute(id: string): Promise<void> {
     const dataset = await this.datasetRepo.findById(id);
     this.validator.assertDatasetExists(dataset, id);
-    // Dataset PROCESSING tidak boleh dihapus — bisa corrupt state
+    // Dataset PROCESSING tidak boleh dihapus — bisa corrupt state export yang sedang berjalan
     this.validator.assertDatasetNotProcessing(dataset);
 
     await this.datasetRepo.delete(id);

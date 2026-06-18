@@ -19,6 +19,20 @@ interface DatasetErrorResponseBody {
   module:     'datasets';
 }
 
+/** Type guard untuk shape standar NestJS HttpException response body */
+function hasStringOrArrayMessage(
+  value: unknown,
+): value is { message: string | string[] } {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('message' in value)) return false;
+
+  const message = (value as { message: unknown }).message;
+  return (
+    typeof message === 'string' ||
+    (Array.isArray(message) && message.every((m) => typeof m === 'string'))
+  );
+}
+
 @Catch(HttpException)
 export class DatasetExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(DatasetExceptionFilter.name);
@@ -32,11 +46,10 @@ export class DatasetExceptionFilter implements ExceptionFilter {
       ? exception.getStatus()
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const exceptionResponse = exception.getResponse();
-    const message =
-      typeof exceptionResponse === 'object' && 'message' in exceptionResponse
-        ? (exceptionResponse as { message: string | string[] }).message
-        : exception.message;
+    const exceptionResponse: unknown = exception.getResponse();
+    const message: string | string[] = hasStringOrArrayMessage(exceptionResponse)
+      ? exceptionResponse.message
+      : exception.message;
 
     const body: DatasetErrorResponseBody = {
       statusCode: status,

@@ -1,4 +1,5 @@
 // src/ai-core/datasets/domains/entities/dataset-item.entity.ts
+
 import {
   BeforeInsert,
   Column,
@@ -14,8 +15,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { DatasetEntity } from './dataset.entity';
 import { PredictionEntity } from '../../../predictions/domains/entities/prediction.entity';
 
-// Unique constraint memastikan satu prediction tidak bisa masuk
-// ke dataset yang sama lebih dari sekali
+/**
+ * Unique constraint memastikan satu prediction tidak bisa masuk
+ * ke dataset yang sama lebih dari sekali.
+ */
 @Unique(['datasetId', 'predictionId'])
 @Entity({ name: 'dataset_items' })
 export class DatasetItemEntity {
@@ -37,7 +40,7 @@ export class DatasetItemEntity {
   @Column({ type: 'varchar', length: 36, nullable: false })
   predictionId: string = '';
 
-  // Timestamp saat admin menambahkan prediction ini ke dataset
+  /** Timestamp saat admin menambahkan prediction ini ke dataset */
   @CreateDateColumn({ type: 'timestamp' })
   addedAt: Date = new Date();
 
@@ -49,8 +52,10 @@ export class DatasetItemEntity {
   @JoinColumn({ name: 'datasetId' })
   dataset!: Relation<DatasetEntity>;
 
-  // onDelete: RESTRICT karena kita tidak boleh menghapus prediction
-  // yang sudah masuk ke dataset — harus hapus dari dataset terlebih dahulu
+  /**
+   * onDelete: RESTRICT — prediction yang sudah masuk dataset tidak boleh dihapus
+   * langsung; harus dihapus dari dataset terlebih dahulu.
+   */
   @ManyToOne(() => PredictionEntity, {
     onDelete: 'RESTRICT',
     nullable: false,

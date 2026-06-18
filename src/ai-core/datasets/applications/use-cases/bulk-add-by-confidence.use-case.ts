@@ -1,12 +1,12 @@
 // src/ai-core/datasets/applications/use-cases/bulk-add-by-confidence.use-case.ts
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { BulkAddByConfidenceDto, BulkAddResultDto } from '../dto/dataset.dto';
+import { BulkAddByConfidenceDto, BulkAddResultDto } from '../dto/bulk-add.dto';
 import { DatasetValidator } from '../../domains/validators/dataset.validator';
 import {
+  CreateDatasetItemData,
   DATASET_REPOSITORY_TOKEN,
   type IDatasetRepository,
-  CreateDatasetItemData,
 } from '../../infrastructures/repositories/dataset.repository.interface';
 import {
   type IPredictionRepository,
@@ -38,12 +38,6 @@ export class BulkAddByConfidenceUseCase {
     this.validator.assertDatasetEditable(dataset);
     this.validator.assertValidThreshold(dto.confidenceThreshold);
 
-    // 2. Ambil SEMUA prediction SUCCESS
-    // IPredictionRepository sudah ada findAllByUserId — kita perlu findAllSuccess.
-    // Karena belum ada method tersebut, kita gunakan pendekatan berbeda:
-    // findAllByUserIdPaginated tidak cocok. Kita inject langsung DataSource atau
-    // tambahkan method baru di interface. Pilihan terbaik: tambah method di repo interface.
-    // Untuk sekarang kita gunakan cast yang type-safe via extended interface.
     const allSuccessPredictions = await this.predictionRepo.findByStatus(
       PredictionStatus.SUCCESS,
     );
@@ -75,32 +69,36 @@ export class BulkAddByConfidenceUseCase {
     );
 
     // 5. Filter hanya yang belum ada di dataset
+    const alreadyInDatasetCount = eligible.filter((p) =>
+      existingPredictionIds.has(p.id),
+    ).length;
+
     const toInsert: CreateDatasetItemData[] = eligible
       .filter((p) => !existingPredictionIds.has(p.id))
       .map((p) => ({ datasetId, predictionId: p.id }));
-
-    const skipped = eligible.length - toInsert.length;
 
     if (toInsert.length === 0) {
       this.logger.log(`[BulkAdd] dataset=${datasetId}: semua sudah ada, skip.`);
       return {
         added:     0,
-        skipped:   eligible.length,
+        skipped:   alreadyInDatasetCount,
         evaluated: allSuccessPredictions.length,
       };
     }
 
-    // 6. Bulk insert + update counter
     const inserted = await this.datasetRepo.createItemsBulk(toInsert);
     await this.datasetRepo.incrementTotalItems(datasetId, inserted);
 
+    const raceConditionSkipped = toInsert.length - inserted;
+    const totalSkipped = alreadyInDatasetCount + raceConditionSkipped;
+
     this.logger.log(
-      `[BulkAdd] dataset=${datasetId}: inserted=${inserted}, skipped=${skipped}`,
+      `[BulkAdd] dataset=${datasetId}: inserted=${inserted}, skipped=${totalSkipped}`,
     );
 
     return {
       added:     inserted,
-      skipped:   skipped + (toInsert.length - inserted), // INSERT IGNORE bisa skip juga
+      skipped:   totalSkipped,
       evaluated: allSuccessPredictions.length,
     };
   }

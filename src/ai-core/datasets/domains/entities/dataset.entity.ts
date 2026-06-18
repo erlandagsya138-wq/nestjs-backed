@@ -1,4 +1,5 @@
 // src/ai-core/datasets/domains/entities/dataset.entity.ts
+
 import {
   BeforeInsert,
   Column,
@@ -12,13 +13,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { DatasetItemEntity } from './dataset-item.entity';
 
 export enum DatasetStatus {
-  // Admin sedang memilih predictions yang akan dimasukkan
+  /** Admin sedang memilih predictions yang akan dimasukkan */
   DRAFT      = 'DRAFT',
-  // Export sedang diproses (file sedang digenerate)
+  /** Export sedang diproses (file sedang digenerate) */
   PROCESSING = 'PROCESSING',
-  // File export sudah siap didownload
+  /** File export sudah siap didownload */
   READY      = 'READY',
-  // Proses export gagal
+  /** Proses export gagal */
   FAILED     = 'FAILED',
 }
 
@@ -55,7 +56,7 @@ export class DatasetEntity {
   })
   status: DatasetStatus = DatasetStatus.DRAFT;
 
-  // URL file export (S3 / local) — null sampai status READY
+  /** URL file export (S3 / local) — null sampai status READY */
   @Column({ type: 'varchar', length: 512, nullable: true, default: null })
   exportUrl: string | null = null;
 
@@ -66,15 +67,18 @@ export class DatasetEntity {
   })
   exportFormat: DatasetExportFormat = DatasetExportFormat.JSON;
 
-  // Denormalisasi jumlah item untuk kemudahan tampilan tanpa COUNT query
+  /**
+   * Denormalisasi jumlah item untuk kemudahan tampilan tanpa COUNT query.
+   * Di-update via incrementTotalItems / decrementTotalItems.
+   */
   @Column({ type: 'int', unsigned: true, nullable: false, default: 0 })
   totalItems: number = 0;
 
-  // Di-set saat export berhasil diselesaikan
+  /** Di-set saat export berhasil diselesaikan */
   @Column({ type: 'timestamp', nullable: true, default: null })
   exportedAt: Date | null = null;
 
-  // errorMessage di-set jika status FAILED
+  /** Di-set jika status FAILED */
   @Column({ type: 'text', nullable: true, default: null })
   errorMessage: string | null = null;
 
@@ -82,8 +86,8 @@ export class DatasetEntity {
   createdAt: Date = new Date();
 
   // ── Relations ────────────────────────────────────────────────
-  @OneToMany(() => DatasetItemEntity, (item) => item.dataset, {
-    cascade: ['insert'],
-  })
+  // FIX: Hapus cascade: ['insert'] — item diinsert secara eksplisit via itemRepo,
+  //      cascade ini tidak diperlukan dan dapat menimbulkan perilaku yang tidak terduga.
+  @OneToMany(() => DatasetItemEntity, (item) => item.dataset)
   items!: Relation<DatasetItemEntity[]>;
 }

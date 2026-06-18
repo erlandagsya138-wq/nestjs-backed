@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
@@ -24,20 +25,17 @@ import {
   ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
-  ApiConflictResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { DatasetOrchestrator } from '../../applications/orchestrator/dataset.orchestrator';
 import {
-  AddPredictionToDatasetDto,
-  BulkAddByConfidenceDto,
-  BulkAddResultDto,
-  CreateDatasetDto,
   DatasetItemResponseDto,
   DatasetResponseDto,
-  ListDatasetsQueryDto,
-  PaginatedDatasetResponseDto,
 } from '../../applications/dto/dataset.dto';
+import { AddPredictionToDatasetDto } from '../../applications/dto/add-prediction.dto';
+import { BulkAddByConfidenceDto, BulkAddResultDto } from '../../applications/dto/bulk-add.dto';
+import { CreateDatasetDto } from '../../applications/dto/create-dataset.dto';
+import { ListDatasetsQueryDto, PaginatedDatasetResponseDto, } from '../../applications/dto/list-datasets-query.dto';
 import { DatasetExceptionFilter } from '../filters/dataset-exception.filter';
 import { JwtAuthGuard } from '../../../../identity/auth/interface/guards/jwt-auth.guard';
 
@@ -223,9 +221,10 @@ export class DatasetController {
     description:
       'Memulai proses export dataset ke file ZIP. ' +
       'File berisi metadata (JSON atau CSV sesuai `exportFormat`) ' +
-      'dan manifest URL gambar. ' +
+      'dan manifest URL gambar (predictionId + imageUrl asal — bukan file ' +
+      'gambar yang di-download). ' +
       'Setelah selesai, `status` berubah ke `READY` dan ' +
-      '`exportUrl` berisi URL download.\n\n' +
+      '`exportUrl` berisi URL download ZIP metadata tersebut.\n\n' +
       '**Dataset harus berstatus DRAFT dan memiliki minimal 1 item.**',
     operationId: 'datasetsExport',
   })

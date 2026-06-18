@@ -11,15 +11,22 @@ export const CONFIDENCE_SCORE_MAX = 1;
 /** Default threshold jika admin tidak menentukan */
 export const DEFAULT_CONFIDENCE_THRESHOLD = 0.7;
 
-/** Status dataset yang memperbolehkan penambahan item */
-export const DATASET_EDITABLE_STATUSES: DatasetStatus[] = [
+/** Status dataset yang memperbolehkan penambahan/penghapusan item dan trigger export */
+export const DATASET_EDITABLE_STATUSES: readonly DatasetStatus[] = [
   DatasetStatus.DRAFT,
-];
+] as const;
 
 /** Status prediction yang layak masuk dataset */
-export const PREDICTION_ELIGIBLE_STATUSES: PredictionStatus[] = [
+export const PREDICTION_ELIGIBLE_STATUSES: readonly PredictionStatus[] = [
   PredictionStatus.SUCCESS,
-];
+] as const;
+
+export interface ConfidenceSummary {
+  count:   number;
+  average: number | null;
+  min:     number | null;
+  max:     number | null;
+}
 
 @Injectable()
 export class DatasetDomainService {
@@ -28,7 +35,7 @@ export class DatasetDomainService {
    * Hanya dataset berstatus DRAFT yang editable.
    */
   isEditable(status: DatasetStatus): boolean {
-    return DATASET_EDITABLE_STATUSES.includes(status);
+    return (DATASET_EDITABLE_STATUSES as ReadonlyArray<DatasetStatus>).includes(status);
   }
 
   /**
@@ -40,7 +47,7 @@ export class DatasetDomainService {
     confidenceScore: number | null,
   ): boolean {
     return (
-      PREDICTION_ELIGIBLE_STATUSES.includes(status) &&
+      (PREDICTION_ELIGIBLE_STATUSES as ReadonlyArray<PredictionStatus>).includes(status) &&
       confidenceScore !== null
     );
   }
@@ -61,9 +68,9 @@ export class DatasetDomainService {
    */
   isValidThreshold(threshold: number): boolean {
     return (
+      Number.isFinite(threshold) &&
       threshold >= CONFIDENCE_SCORE_MIN &&
-      threshold <= CONFIDENCE_SCORE_MAX &&
-      Number.isFinite(threshold)
+      threshold <= CONFIDENCE_SCORE_MAX
     );
   }
 
@@ -87,13 +94,9 @@ export class DatasetDomainService {
 
   /**
    * Build ringkasan statistik dataset dari list confidence scores.
+   * Mengembalikan null untuk average/min/max jika tidak ada scores.
    */
-  buildConfidenceSummary(scores: number[]): {
-    count:   number;
-    average: number | null;
-    min:     number | null;
-    max:     number | null;
-  } {
+  buildConfidenceSummary(scores: number[]): ConfidenceSummary {
     if (scores.length === 0) {
       return { count: 0, average: null, min: null, max: null };
     }
@@ -102,7 +105,8 @@ export class DatasetDomainService {
 
     return {
       count:   scores.length,
-      average: Math.round((sum / scores.length) * 10000) / 10000,
+      // Bulatkan ke 4 desimal untuk konsistensi dengan DB numeric precision
+      average: Math.round((sum / scores.length) * 10_000) / 10_000,
       min:     Math.min(...scores),
       max:     Math.max(...scores),
     };

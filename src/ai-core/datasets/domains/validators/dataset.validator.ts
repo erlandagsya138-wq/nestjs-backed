@@ -7,7 +7,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { DatasetEntity } from '../entities/dataset.entity';
+import { DatasetEntity, DatasetStatus } from '../entities/dataset.entity';
 import { DatasetItemEntity } from '../entities/dataset-item.entity';
 import { PredictionEntity } from '../../../predictions/domains/entities/prediction.entity';
 import { DatasetDomainService } from '../services/dataset-domain.service';
@@ -19,10 +19,10 @@ export class DatasetValidator {
   // ── Dataset assertions ────────────────────────────────────────────────────
 
   assertDatasetExists(
-    dataset: DatasetEntity | null,
+    dataset: DatasetEntity | null | undefined,
     id: string,
   ): asserts dataset is DatasetEntity {
-    if (!dataset) {
+    if (dataset == null) {
       throw new NotFoundException(`Dataset dengan id '${id}' tidak ditemukan.`);
     }
   }
@@ -36,8 +36,12 @@ export class DatasetValidator {
     }
   }
 
+  /**
+   * FIX: Sebelumnya menggunakan string literal 'PROCESSING'.
+   * Sekarang menggunakan enum DatasetStatus.PROCESSING untuk type-safety.
+   */
   assertDatasetNotProcessing(dataset: DatasetEntity): void {
-    if (dataset.status === 'PROCESSING') {
+    if (dataset.status === DatasetStatus.PROCESSING) {
       throw new ConflictException(
         `Dataset '${dataset.id}' sedang dalam proses export. Tunggu hingga selesai.`,
       );
@@ -47,10 +51,10 @@ export class DatasetValidator {
   // ── Dataset item assertions ───────────────────────────────────────────────
 
   assertItemExists(
-    item: DatasetItemEntity | null,
+    item: DatasetItemEntity | null | undefined,
     itemId: string,
   ): asserts item is DatasetItemEntity {
-    if (!item) {
+    if (item == null) {
       throw new NotFoundException(
         `Dataset item dengan id '${itemId}' tidak ditemukan.`,
       );
@@ -79,10 +83,10 @@ export class DatasetValidator {
   // ── Prediction assertions ─────────────────────────────────────────────────
 
   assertPredictionExists(
-    prediction: PredictionEntity | null,
+    prediction: PredictionEntity | null | undefined,
     predictionId: string,
   ): asserts prediction is PredictionEntity {
-    if (!prediction) {
+    if (prediction == null) {
       throw new NotFoundException(
         `Prediction dengan id '${predictionId}' tidak ditemukan.`,
       );
@@ -115,9 +119,10 @@ export class DatasetValidator {
         threshold,
       )
     ) {
-      const score = prediction.confidenceScore !== null
-        ? this.domainService.formatConfidenceScore(prediction.confidenceScore)
-        : 'null';
+      const score =
+        prediction.confidenceScore !== null
+          ? this.domainService.formatConfidenceScore(prediction.confidenceScore)
+          : 'null';
 
       throw new UnprocessableEntityException(
         `Prediction '${prediction.id}' memiliki confidence score ${score}, ` +

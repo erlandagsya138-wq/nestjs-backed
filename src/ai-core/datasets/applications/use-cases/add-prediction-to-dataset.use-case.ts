@@ -1,7 +1,8 @@
 // src/ai-core/datasets/applications/use-cases/add-prediction-to-dataset.use-case.ts
 
 import { Inject, Injectable } from '@nestjs/common';
-import { AddPredictionToDatasetDto, DatasetItemResponseDto } from '../dto/dataset.dto';
+import { DatasetItemResponseDto } from '../dto/dataset.dto';
+import { AddPredictionToDatasetDto } from '../dto/add-prediction.dto';
 import { DatasetMapper } from '../../domains/mappers/dataset.mapper';
 import { DatasetValidator } from '../../domains/validators/dataset.validator';
 import {
@@ -39,7 +40,7 @@ export class AddPredictionToDatasetUseCase {
     this.validator.assertPredictionEligible(prediction);
 
     // 3. Cek confidence threshold jika disertakan
-    if (dto.confidenceThreshold !== null) {
+    if (dto.confidenceThreshold != null) {
       this.validator.assertValidThreshold(dto.confidenceThreshold);
       this.validator.assertPredictionMeetsThreshold(
         prediction,

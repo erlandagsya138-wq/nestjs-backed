@@ -1,19 +1,7 @@
 // src/ai-core/datasets/applications/use-cases/export-dataset.use-case.ts
-//
-// Pipeline export:
-//   1. Validasi dataset DRAFT + ada items
-//   2. Set status → PROCESSING
-//   3. Fetch semua predictions dengan storedFile
-//   4. Generate metadata file (JSON atau CSV)
-//   5. Download semua gambar dari imageUrl
-//   6. Kemas dalam ZIP
-//   7. Upload ZIP ke storage
-//   8. Set status → READY + simpan exportUrl
-//   Jika error di step manapun → set status → FAILED
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import * as archiver from 'archiver';
-import { Writable, PassThrough } from 'stream';
+import { ZipArchive } from 'archiver';
 import { DatasetResponseDto } from '../dto/dataset.dto';
 import { DatasetMapper } from '../../domains/mappers/dataset.mapper';
 import { DatasetValidator } from '../../domains/validators/dataset.validator';
@@ -21,21 +9,16 @@ import { DatasetDomainService } from '../../domains/services/dataset-domain.serv
 import { DatasetExportFormat, DatasetStatus } from '../../domains/entities/dataset.entity';
 import {
   DATASET_REPOSITORY_TOKEN,
+  type DatasetItemWithPrediction,
   type IDatasetRepository,
 } from '../../infrastructures/repositories/dataset.repository.interface';
-import {
-  type IPredictionRepository,
-  PREDICTION_REPOSITORY_TOKEN,
-} from '../../../predictions/infrastructures/repositories/prediction.repository.interface';
-import {
-  type IStorageAdapter,
-  STORAGE_ADAPTER_TOKEN,
-} from '../../../../shared/storage/infrastructures/adapters/storage.adapter.interface';
+import { STORAGE_ADAPTER_TOKEN, type IStorageAdapter } from '../../../../shared/storage/infrastructures/adapters/storage.adapter.interface';
 import { RawUploadedFile } from '../../../../shared/storage/domains/entities/stored-file.entity';
 
-// Record entry yang masuk ke file metadata dataset
+/** Record entry yang masuk ke file metadata dataset (dataset.json / dataset.csv) */
 interface DatasetExportRecord {
   predictionId:    string;
+  imageUrl:        string;
   imageFile:       string;
   varietyCode:     string | null;
   varietyName:     string | null;
@@ -53,8 +36,6 @@ export class ExportDatasetUseCase {
   constructor(
     @Inject(DATASET_REPOSITORY_TOKEN)
     private readonly datasetRepo: IDatasetRepository,
-    @Inject(PREDICTION_REPOSITORY_TOKEN)
-    private readonly predictionRepo: IPredictionRepository,
     @Inject(STORAGE_ADAPTER_TOKEN)
     private readonly storageAdapter: IStorageAdapter,
     private readonly validator: DatasetValidator,
@@ -74,44 +55,43 @@ export class ExportDatasetUseCase {
     this.logger.log(`[Export] dataset=${datasetId}: status → PROCESSING`);
 
     try {
-      // ── 3. Fetch semua items + predictions ───────────────────────────────
-      const items = await this.datasetRepo.findItemsByDatasetId(datasetId);
+      // ── 3. Fetch semua items + predictions dalam SATU query ──────────────
+      // FIX: Sebelumnya melakukan N+1 query (loop predictionRepo.findById per item),
+      // dan dipanggil DUA KALI (sekali di sini, sekali lagi di _buildItemDtos
+      // setelah export selesai). Sekarang cukup satu JOIN query, hasilnya dipakai
+      // ulang untuk membangun records ZIP maupun response DTO.
+      const itemsWithPredictions =
+        await this.datasetRepo.findItemsWithPredictionsByDatasetId(datasetId);
 
-      const records: DatasetExportRecord[] = [];
+      const records: DatasetExportRecord[] = itemsWithPredictions.map(
+        ({ item, prediction }) => {
+          const ext       = this._extractExtension(prediction.imageUrl);
+          const imageFile = `images/${prediction.id}${ext}`;
 
-      for (const item of items) {
-        const prediction = await this.predictionRepo.findById(item.predictionId);
-        if (!prediction) continue;
+          const confidenceTier =
+            prediction.confidenceScore !== null
+              ? this.domainService.classifyConfidence(prediction.confidenceScore)
+              : null;
 
-        const ext       = this._extractExtension(prediction.imageUrl);
-        const imageFile = `images/${prediction.id}${ext}`;
-
-        const confidenceTier =
-          prediction.confidenceScore !== null
-            ? this.domainService.classifyConfidence(prediction.confidenceScore)
-            : null;
-
-        records.push({
-          predictionId:    prediction.id,
-          imageFile,
-          varietyCode:     prediction.varietyCode,
-          varietyName:     prediction.varietyName,
-          confidenceScore: prediction.confidenceScore,
-          confidenceTier,
-          isVerified:      prediction.isVerified,
-          allVarieties:    prediction.allVarieties,
-          addedAt:         item.addedAt.toISOString(),
-        });
-      }
-
-      // ── 4. Build ZIP in memory ───────────────────────────────────────────
-      const zipBuffer = await this._buildZip(
-        dataset.exportFormat,
-        records,
-        items.map((item) => item.predictionId),
+          return {
+            predictionId:    prediction.id,
+            imageUrl:        prediction.imageUrl,
+            imageFile,
+            varietyCode:     prediction.varietyCode,
+            varietyName:     prediction.varietyName,
+            confidenceScore: prediction.confidenceScore,
+            confidenceTier,
+            isVerified:      prediction.isVerified,
+            allVarieties:    prediction.allVarieties,
+            addedAt:         item.addedAt.toISOString(),
+          };
+        },
       );
 
-      // ── 5. Upload ke storage ─────────────────────────────────────────────
+      // ── 4 & 5. Build ZIP in memory ───────────────────────────────────────
+      const zipBuffer = await this._buildZip(dataset.exportFormat, records);
+
+      // ── 6. Upload ke storage ─────────────────────────────────────────────
       const exportFileName = `datasets/${datasetId}/export-${Date.now()}.zip`;
 
       const rawFile: RawUploadedFile = Object.assign(new RawUploadedFile(), {
@@ -124,25 +104,23 @@ export class ExportDatasetUseCase {
       const uploadResult = await this.storageAdapter.upload(rawFile, exportFileName);
       const exportUrl    = uploadResult.imageUrl;
 
-      // ── 6. Set READY ─────────────────────────────────────────────────────
+      // ── 7. Set READY ─────────────────────────────────────────────────────
       const updated = await this.datasetRepo.updateStatus(datasetId, {
-        status: DatasetStatus.READY,
+        status:     DatasetStatus.READY,
         exportUrl,
         exportedAt: new Date(),
       });
 
-      this.logger.log(
-        `[Export] dataset=${datasetId}: DONE → exportUrl=${exportUrl}`,
+      this.logger.log(`[Export] dataset=${datasetId}: DONE → exportUrl=${exportUrl}`);
+
+      const itemDtos = itemsWithPredictions.map(({ item, prediction }) =>
+        this.mapper.toItemResponseDto(item, prediction),
       );
 
-      const itemDtos = await this._buildItemDtos(datasetId);
       return this.mapper.toResponseDto(updated, itemDtos);
-
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(
-        `[Export] dataset=${datasetId}: FAILED → ${message}`,
-      );
+      this.logger.error(`[Export] dataset=${datasetId}: FAILED → ${message}`);
 
       await this.datasetRepo.updateStatus(datasetId, {
         status:       DatasetStatus.FAILED,
@@ -156,22 +134,16 @@ export class ExportDatasetUseCase {
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private async _buildZip(
-    format:        DatasetExportFormat,
-    records:       DatasetExportRecord[],
-    predictionIds: string[],
+    format:  DatasetExportFormat,
+    records: DatasetExportRecord[],
   ): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const passThrough = new PassThrough();
+    return new Promise<Buffer>((resolve, reject) => {
       const chunks: Buffer[] = [];
+      const archive = new ZipArchive({ zlib: { level: 6 } });
 
-      passThrough.on('data', (chunk: Buffer) => chunks.push(chunk));
-      passThrough.on('end', () => resolve(Buffer.concat(chunks)));
-      passThrough.on('error', reject);
-
-      const archive = archiver.create('zip', { zlib: { level: 6 } });
-      archive.pipe(passThrough as unknown as Writable);
-
-      archive.on('error', reject);
+      archive.on('data', (chunk: Buffer) => chunks.push(chunk));
+      archive.on('error', (err: Error) => reject(err));
+      archive.on('end', () => resolve(Buffer.concat(chunks)));
 
       // Metadata file
       if (format === DatasetExportFormat.JSON) {
@@ -182,10 +154,10 @@ export class ExportDatasetUseCase {
         archive.append(csv, { name: 'dataset.csv' });
       }
 
-      // Placeholder untuk gambar — fetch async dilakukan terpisah
-      // Untuk simplisitas capstone: include URL list sebagai manifest
-      const manifest = predictionIds.join('\n');
-      archive.append(manifest, { name: 'image_manifest.txt' });
+      // Manifest gambar: predictionId + URL asal, BUKAN gambar yang ter-download.
+      // Lihat catatan pipeline di kepala file ini.
+      const manifestLines = records.map((r) => `${r.predictionId}\t${r.imageUrl}`);
+      archive.append(manifestLines.join('\n'), { name: 'image_manifest.txt' });
 
       void archive.finalize();
     });
@@ -195,6 +167,7 @@ export class ExportDatasetUseCase {
     const headers = [
       'predictionId',
       'imageFile',
+      'imageUrl',
       'varietyCode',
       'varietyName',
       'confidenceScore',
@@ -203,18 +176,26 @@ export class ExportDatasetUseCase {
       'addedAt',
     ];
 
-    const rows = records.map((r) => [
-      r.predictionId,
-      r.imageFile,
-      r.varietyCode ?? '',
-      r.varietyName ?? '',
-      r.confidenceScore !== null ? String(r.confidenceScore) : '',
-      r.confidenceTier ?? '',
-      r.isVerified !== null ? String(r.isVerified) : '',
-      r.addedAt,
-    ].map((v) => `"${v.replace(/"/g, '""')}"`).join(','));
+    const escapeCsvField = (value: string): string =>
+      `"${value.replace(/"/g, '""')}"`;
 
-    return [headers.join(','), ...rows].join('\n');
+    const rows = records.map((r) =>
+      [
+        r.predictionId,
+        r.imageFile,
+        r.imageUrl,
+        r.varietyCode ?? '',
+        r.varietyName ?? '',
+        r.confidenceScore !== null ? String(r.confidenceScore) : '',
+        r.confidenceTier ?? '',
+        r.isVerified !== null ? String(r.isVerified) : '',
+        r.addedAt,
+      ]
+        .map(escapeCsvField)
+        .join(','),
+    );
+
+    return [headers.map(escapeCsvField).join(','), ...rows].join('\n');
   }
 
   private _extractExtension(imageUrl: string): string {
@@ -226,16 +207,5 @@ export class ExportDatasetUseCase {
     } catch {
       return '.jpg';
     }
-  }
-
-  private async _buildItemDtos(datasetId: string) {
-    const items = await this.datasetRepo.findItemsByDatasetId(datasetId);
-    return Promise.all(
-      items.map(async (item) => {
-        const prediction = await this.predictionRepo.findById(item.predictionId);
-        if (!prediction) return null;
-        return this.mapper.toItemResponseDto(item, prediction);
-      }),
-    ).then((r) => r.filter((x) => x !== null));
   }
 }
