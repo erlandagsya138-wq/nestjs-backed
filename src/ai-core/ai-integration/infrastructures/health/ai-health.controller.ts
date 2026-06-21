@@ -1,6 +1,6 @@
 // src/ai-integration/infrastructures/health/ai-health.controller.ts
 import { Controller, Get, Logger, MessageEvent, Sse } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -18,7 +18,7 @@ export class AiHealthController {
   constructor(private readonly aiHealthService: AiHealthService) {}
 
   @Public()
-  @SkipThrottle()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Sse('status')
   @ApiOperation({
     summary: 'Stream status AI (SSE)',
