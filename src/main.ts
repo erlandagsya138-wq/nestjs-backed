@@ -8,8 +8,13 @@ import compression from 'compression';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './shared/common/filters/global-exception.filter';
 import { setupSwagger } from './swagger.config';
+import { IncomingMessage, ServerResponse } from 'http';
 
 const JSON_BODY_LIMIT = '1mb';
+
+interface RequestWithRawBody extends IncomingMessage {
+  rawBody?: Buffer;
+}
 
 function buildCorsOrigins(
   config: ConfigService,
@@ -34,10 +39,6 @@ async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    // ── KRITIS: jangan aktifkan bodyParser bawaan NestFactory ──────────────
-    // Kita daftarkan sendiri di bawah dengan opsi `verify` agar rawBody
-    // bisa di-capture SEBELUM JSON di-parse. Tanpa ini HmacSignatureGuard
-    // selalu gagal karena req.rawBody tidak pernah terisi.
     bodyParser: false,
     logger:
       process.env.NODE_ENV === 'production'
@@ -84,15 +85,9 @@ async function bootstrap(): Promise<void> {
   app.use(compression());
 
   // ── Body Parser dengan rawBody capture ───────────────────────
-  // `verify` dipanggil SEBELUM parsing — saat ini raw bytes masih utuh.
-  // Kita simpan ke req.rawBody agar HmacSignatureGuard bisa verifikasi
-  // HMAC terhadap byte yang persis sama dengan yang dikirim client.
-  //
-  // Ini menggantikan RawBodyMiddleware yang sebelumnya tidak berfungsi
-  // karena stream sudah habis dikonsumsi oleh bodyParser bawaan NestFactory.
   app.useBodyParser('json', {
     limit: JSON_BODY_LIMIT,
-    verify: (req: any, _res: any, buf: Buffer) => {
+    verify: (req: RequestWithRawBody, _res: ServerResponse, buf: Buffer) => {
       req.rawBody = buf;
     },
   });
