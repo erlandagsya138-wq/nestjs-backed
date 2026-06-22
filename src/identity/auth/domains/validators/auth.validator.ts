@@ -4,7 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { UserEntity } from '../../../users/domains/entities/user.entity';
 
 const DUMMY_HASH =
-  '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+  '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiNb/k/cG/MRcLeGimGNA.n16vLzmu';
 
 @Injectable()
 export class AuthValidator {
@@ -25,12 +25,10 @@ export class AuthValidator {
     plainPassword: string,
     hashedPassword: string | null,
   ): Promise<void> {
-    // Selalu jalankan bcrypt.compare — jangan short-circuit meski hash null
     const hashToCompare = hashedPassword ?? DUMMY_HASH;
     const isMatch = await bcrypt.compare(plainPassword, hashToCompare);
 
-    // Jika hash adalah dummy (user tidak ada), isMatch pasti false
-    if (!isMatch) {
+    if (!isMatch || !hashedPassword) {
       throw new UnauthorizedException('Email atau password tidak valid');
     }
   }

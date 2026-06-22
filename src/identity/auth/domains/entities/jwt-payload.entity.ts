@@ -2,6 +2,7 @@
 export class JwtPayload {
   sub: string = '';
   email: string = '';
+  role: string = '';
   iss?: string;
   aud?: string | string[];
   iat?: number;
@@ -11,4 +12,5 @@ export class JwtPayload {
 export class AuthenticatedUser {
   sub: string = '';
   email: string = '';
+  role: string = '';
 }

@@ -29,13 +29,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  /**
-   * FIX [MEDIUM-03]: Generic TUser diganti dengan tipe konkret
-   * AuthenticatedUser sebagai constraint eksplisit.
-   *
-   * Sebelumnya TUser tidak memiliki constraint sehingga tipe apapun
-   * bisa lolos — ini mengurangi type-safety di layer guard yang kritis.
-   */
   handleRequest<TUser = AuthenticatedUser>(
     err: unknown,
     user: TUser,

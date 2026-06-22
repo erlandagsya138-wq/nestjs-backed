@@ -32,23 +32,30 @@ export class AuthExceptionFilter implements ExceptionFilter {
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const exceptionResponse = exception.getResponse();
-    const message =
+    let message =
       typeof exceptionResponse === 'object' && 'message' in exceptionResponse
         ? (exceptionResponse as { message: string | string[] }).message
         : exception.message;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(
+        `[Auth] SYSTEM ERROR ${req.method} ${req.url} → Asli: ${JSON.stringify(message)} | Stack: ${exception.stack}`
+      );
+      message = 'Terjadi kesalahan internal pada layanan Autentikasi.';
+    } else {
+      this.logger.warn(
+        `[Auth] ${req.method} ${req.url} → ${status}: ${JSON.stringify(message)}`
+      );
+    }
 
     const body: AuthErrorResponseBody = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: req.url,
       message,
-      error: exception.name,
+      error: status === HttpStatus.INTERNAL_SERVER_ERROR ? 'Internal Server Error' : exception.name,
       module: 'auth',
     };
-
-    this.logger.warn(
-      `[Auth] ${req.method} ${req.url} → ${status}: ${JSON.stringify(message)}`,
-    );
 
     res.status(status).json(body);
   }

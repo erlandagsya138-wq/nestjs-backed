@@ -13,6 +13,7 @@ export class AuthMapper {
     return {
       sub: user.id,
       email: user.email,
+      role: user.role,
     };
   }
 
@@ -21,6 +22,7 @@ export class AuthMapper {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+      role: user.role,
     };
   }
 

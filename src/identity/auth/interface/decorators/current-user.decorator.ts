@@ -12,6 +12,7 @@ const logger = new Logger('CurrentUserDecorator');
 export interface JwtUserPayload {
   sub:   string;  // userId (UUID)
   email: string;
+  role: string;
 }
 
 /**

@@ -18,6 +18,12 @@ export class AuthUserDto {
     description: 'Nama lengkap user, null jika belum diisi',
   })
   fullName: string | null = null;
+
+  @ApiProperty({
+    example:     'user',
+    description: 'Peran user dalam sistem',
+  })
+  role: string = '';
 }
 
 export class AuthResponseDto {

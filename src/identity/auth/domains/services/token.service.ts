@@ -32,6 +32,7 @@ export class TokenService {
     return this.jwtService.sign({
       sub:   payload.sub,
       email: payload.email,
+      role: payload.role,
     });
   }
 
@@ -67,6 +68,7 @@ export class TokenService {
     return {
       sub:   payload.sub,
       email: payload.email,
+      role:  payload.role,
     };
   }
 
