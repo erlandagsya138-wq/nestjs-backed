@@ -17,18 +17,10 @@ export class MarketIntelligenceOrchestrator {
     private readonly marketPriceRepo: IMarketPriceRepository,
   ) {}
 
-  // =========================================================================
-  // METHOD 1: Untuk menerima data dari scraper Python
-  // (Method ini wajib ada agar MarketIntelligenceController tidak error)
-  // =========================================================================
   ingestReport(dto: MarketReportDto): Promise<MarketReportIngestResponseDto> {
     return this.processMarketReport.execute(dto);
   }
 
-  // =========================================================================
-  // METHOD 2: Untuk mengirim harga ke frontend setelah prediksi AI selesai
-  // (Dipanggil oleh CreatePredictionUseCase)
-  // =========================================================================
   async getPriceSummaryByVariety(varietyCode: string): Promise<MarketPriceSummaryDto | null> {
     const summary = await this.marketPriceRepo.createQueryBuilder('mp')
       .select('MIN(mp.pricePerKgAvg)', 'minPriceKg')

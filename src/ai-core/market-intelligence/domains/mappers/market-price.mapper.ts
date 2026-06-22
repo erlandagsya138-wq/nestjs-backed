@@ -1,11 +1,4 @@
 // src/ai-core/market-intelligence/domains/mappers/market-price.mapper.ts
-//
-// v4 Sinkron dengan entity & DTO v4:
-//   - MarketPriceResponseDto: hapus pricePerKgMin/Max, locationHint, sellerType.
-//     Tambah pricePerUnit sebagai field utama.
-//   - toCreateData(): tambah pricePerUnit dan pricePerKgAvg yang sebelumnya
-//     tidak diisi sama sekali (bug di v3).
-//   - toResponseDto(): sinkron dengan field entity v4.
 
 import { Injectable }                       from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -55,15 +48,6 @@ export class MarketPriceResponseDto {
 
 @Injectable()
 export class MarketPriceMapper {
-  /**
-   * Konversi DTO → data untuk repository.bulkCreate().
-   *
-   * @param entry        - Validated DTO dari Python agent
-   * @param sourceName   - Nama platform (e.g. "shopee.co.id")
-   * @param sourceUrl    - URL produk Google Shopping
-   * @param agentVersion - Versi Python agent
-   * @param agentRunId   - UUID AgentRunEntity (FK wajib)
-   */
   toCreateData(
     entry:        MarketPriceEntryDto,
     sourceName:   string,

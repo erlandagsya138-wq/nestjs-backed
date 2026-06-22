@@ -34,10 +34,6 @@ export class HmacSignatureGuard implements CanActivate {
       );
     }
 
-    // rawBody dijamin terisi oleh verify callback di main.ts useBodyParser.
-    // Jika tidak ada, berarti request masuk lewat jalur non-JSON (tidak wajar
-    // untuk endpoint ini) — tolak segera daripada fallback ke stringify yang
-    // tidak deterministic.
     const rawBody = request.rawBody;
 
     if (!rawBody || rawBody.length === 0) {

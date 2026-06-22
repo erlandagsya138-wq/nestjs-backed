@@ -1,23 +1,11 @@
 // src/ai-core/market-intelligence/domains/validators/market-price.validator.ts
-//
-// v4 Sinkron dengan DTO v4:
-//   - _basicRejectionReason(): hapus cek price_per_kg_min/max, price_per_unit_min/max.
-//     Sekarang cek satu field: price_per_unit (wajib > 0).
-//   - IQR outlier detection: baca dari e.price_per_unit (bukan min ?? max lagi).
-//   - assertAtLeastOnePrice(): dihapus — tidak relevan lagi karena price_per_unit
-//     sekarang @IsNumber() @Min(0) @IsNotEmpty() di DTO, validasi sudah di layer DTO.
 
 import { Injectable, Logger } from '@nestjs/common';
 import { MarketPriceEntryDto } from '../../applications/dto/market-price-entry.dto';
 import { DurianVarietyCode }   from '../entities/market-price.entity';
 
 const VALID_VARIETY_CODES = new Set<string>(Object.values(DurianVarietyCode));
-
-// Entry di luar Q1 - MULTIPLIER×IQR atau Q3 + MULTIPLIER×IQR dibuang.
 const IQR_MULTIPLIER = 1.5;
-
-// Minimum entry per varietas agar IQR bermakna.
-// Di bawah angka ini, semua entry yang lolos filter dasar langsung disimpan.
 const IQR_MIN_SAMPLE = 3;
 
 @Injectable()

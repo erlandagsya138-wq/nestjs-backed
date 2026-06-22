@@ -1,7 +1,4 @@
 // src/ai-core/market-intelligence/infrastructures/repositories/market-price.repository.ts
-//
-// Tambahan: findCurrentAverages() — query view variety_price_avg.
-// Ini satu-satunya method yang dipanggil untuk menampilkan harga ke pengguna.
 
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -58,24 +55,20 @@ export class MarketPriceRepository implements IMarketPriceRepository {
     }
   }
 
-  /**
-   * Query view variety_price_avg — hasil agregasi bersih siap ditampilkan ke pengguna.
-   * Kembalikan array terurut: D197, D13, D24, D2.
-   */
   async findCurrentAverages(): Promise<VarietyPriceAverage[]> {
     try {
       const rows = await this.dataSource.query<VarietyPriceAverage[]>(
         `SELECT
-           variety_code,
-           variety_name,
-           avg_price_per_unit,
-           min_price_per_unit,
-           max_price_per_unit,
-           avg_price_per_kg,
-           sample_count,
-           avg_confidence,
-           latest_data_at
-         FROM variety_price_avg`,
+          variety_code,
+          variety_name,
+          avg_price_per_unit,
+          min_price_per_unit,
+          max_price_per_unit,
+          avg_price_per_kg,
+          sample_count,
+          avg_confidence,
+          latest_data_at
+        FROM variety_price_avg`,
       );
       return rows;
     } catch (err: unknown) {

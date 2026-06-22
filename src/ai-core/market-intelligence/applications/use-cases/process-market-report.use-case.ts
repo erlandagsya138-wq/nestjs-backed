@@ -39,6 +39,18 @@ export class ProcessMarketReportUseCase {
   async execute(dto: MarketReportDto): Promise<MarketReportIngestResponseDto> {
     const { run_id, agent_version, status, entries } = dto;
 
+    const existing = await this.agentRunRepo.findOne({ where: { id: run_id } });
+    if (existing) {
+      this.logger.warn(`[ProcessMarketReport] Laporan duplikat terdeteksi (Idempotency) → run_id=${run_id}. Diabaikan.`);
+      return {
+        accepted:         true,
+        run_id,
+        entries_saved:    0,
+        entries_rejected: entries.length,
+        message:          `Idempotent: Laporan dengan run_id ini sudah pernah diproses.`,
+      };
+    }
+
     this.logger.log(
       `[ProcessMarketReport] START → run_id=${run_id}, ` +
         `agent_version=${agent_version}, status=${status}, ` +
@@ -79,8 +91,6 @@ export class ProcessMarketReportUseCase {
       const createDataList = valid.map((entry) =>
         this.mapper.toCreateData(
           entry,
-          // Pakai source dari entry (nama platform asli seperti "Tokopedia"),
-          // fallback ke placeholder jika kosong.
           entry.source_name || FALLBACK_SOURCE_NAME,
           entry.source_url  || FALLBACK_SOURCE_URL,
           agent_version,

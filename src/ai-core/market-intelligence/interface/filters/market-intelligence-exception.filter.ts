@@ -32,10 +32,21 @@ export class MarketIntelligenceExceptionFilter implements ExceptionFilter {
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const exceptionResponse = exception.getResponse();
-    const message =
+    let message =
       typeof exceptionResponse === 'object' && 'message' in exceptionResponse
         ? (exceptionResponse as { message: string | string[] }).message
         : exception.message;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(
+        `[MarketIntelligence] SYSTEM ERROR ${req.method} ${req.url} → Asli: ${JSON.stringify(message)} | Stack: ${exception.stack}`
+      );
+      message = 'Terjadi kesalahan internal pada layanan Market Intelligence. Silakan coba lagi.';
+    } else {
+      this.logger.warn(
+        `[MarketIntelligence] ${req.method} ${req.url} → ${status}: ${JSON.stringify(message)}`,
+      );
+    }
 
     const body: MarketIntelligenceErrorResponseBody = {
       statusCode: status,

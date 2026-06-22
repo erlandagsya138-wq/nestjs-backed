@@ -9,6 +9,7 @@ import {
   MaxLength,
   Min,
   ValidateNested,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AgentRunStatus } from '../../domains/entities/agent-run-status.entity';
@@ -38,6 +39,7 @@ export class MarketReportDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MarketPriceEntryDto)
+  @ArrayMaxSize(3000, { message: 'Maksimal 3000 entri per laporan untuk mencegah overload sistem.' })
   entries: MarketPriceEntryDto[] = [];
 
   @IsInt()

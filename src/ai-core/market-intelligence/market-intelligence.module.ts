@@ -1,7 +1,4 @@
 // src/ai-core/market-intelligence/market-intelligence.module.ts
-//
-// v3 Fix: Tambah AgentRunEntity ke TypeOrmModule.forFeature()
-// agar ProcessMarketReportUseCase bisa inject Repository<AgentRunEntity>.
 
 import { Module }        from '@nestjs/common';
 import { ConfigModule }  from '@nestjs/config';
@@ -28,7 +25,7 @@ import { MarketIntelligenceController } from './interface/http/market-intelligen
   imports: [
     ConfigModule,
     TypeOrmModule.forFeature([
-      AgentRunEntity,    // ← BARU: wajib agar upsert agent_run berfungsi
+      AgentRunEntity,
       MarketPriceEntity,
     ]),
   ],

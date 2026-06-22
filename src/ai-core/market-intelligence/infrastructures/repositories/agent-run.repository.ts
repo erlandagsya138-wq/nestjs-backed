@@ -1,7 +1,4 @@
 // src/ai-core/market-intelligence/infrastructures/repositories/agent-run.repository.ts
-//
-// [FIX-NEST-5] Implementasi AgentRunRepository.
-// Menggunakan upsert agar duplicate run_id (retry submission) tidak error.
 
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -71,7 +68,6 @@ export class AgentRunRepository implements IAgentRunRepository {
     try {
       await this.ormRepo.update({ id: runId }, { totalPricesFound: count });
     } catch (err: unknown) {
-      // Non-fatal: log saja, jangan throw
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(
         `[AgentRunRepository] updatePricesFound gagal (non-fatal): ${message}`,

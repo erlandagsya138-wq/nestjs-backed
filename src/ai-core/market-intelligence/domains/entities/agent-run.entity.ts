@@ -1,7 +1,4 @@
 // src/ai-core/market-intelligence/domains/entities/agent-run.entity.ts
-//
-// v3 Fix: Tambah field agentVersion agar bisa dicatat versi Python agent
-// yang mengirim laporan. Diperlukan untuk tracing/debug.
 
 import {
   BeforeInsert,
