@@ -10,16 +10,6 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
-interface DatasetErrorResponseBody {
-  statusCode: number;
-  timestamp:  string;
-  path:       string;
-  message:    string | string[];
-  error:      string;
-  module:     'datasets';
-}
-
-/** Type guard untuk shape standar NestJS HttpException response body */
 function hasStringOrArrayMessage(
   value: unknown,
 ): value is { message: string | string[] } {
@@ -47,22 +37,29 @@ export class DatasetExceptionFilter implements ExceptionFilter {
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const exceptionResponse: unknown = exception.getResponse();
-    const message: string | string[] = hasStringOrArrayMessage(exceptionResponse)
+    let message: string | string[] = hasStringOrArrayMessage(exceptionResponse)
       ? exceptionResponse.message
       : exception.message;
 
-    const body: DatasetErrorResponseBody = {
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(
+        `[Datasets] SYSTEM ERROR ${req.method} ${req.url} → Asli: ${JSON.stringify(message)} | Stack: ${exception.stack}`,
+      );
+      message = 'Terjadi kesalahan internal pada layanan Datasets. Silakan coba lagi nanti.';
+    } else {
+      this.logger.warn(
+        `[Datasets] ${req.method} ${req.url} → ${status}: ${JSON.stringify(message)}`,
+      );
+    }
+
+    const body = {
       statusCode: status,
       timestamp:  new Date().toISOString(),
       path:       req.url,
       message,
-      error:      exception.name,
+      error:      status === HttpStatus.INTERNAL_SERVER_ERROR ? 'Internal Server Error' : exception.name,
       module:     'datasets',
     };
-
-    this.logger.warn(
-      `[Datasets] ${req.method} ${req.url} → ${status}: ${JSON.stringify(message)}`,
-    );
 
     res.status(status).json(body);
   }

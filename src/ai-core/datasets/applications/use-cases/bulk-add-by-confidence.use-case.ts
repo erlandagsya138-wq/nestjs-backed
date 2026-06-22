@@ -13,7 +13,6 @@ import {
   PREDICTION_REPOSITORY_TOKEN,
 } from '../../../predictions/infrastructures/repositories/prediction.repository.interface';
 import { DatasetDomainService } from '../../domains/services/dataset-domain.service';
-import { PredictionStatus } from '../../../predictions/domains/entities/prediction.entity';
 
 @Injectable()
 export class BulkAddByConfidenceUseCase {
@@ -32,74 +31,66 @@ export class BulkAddByConfidenceUseCase {
     datasetId: string,
     dto: BulkAddByConfidenceDto,
   ): Promise<BulkAddResultDto> {
-    // 1. Validasi dataset
     const dataset = await this.datasetRepo.findById(datasetId);
     this.validator.assertDatasetExists(dataset, datasetId);
     this.validator.assertDatasetEditable(dataset);
     this.validator.assertValidThreshold(dto.confidenceThreshold);
 
-    const allSuccessPredictions = await this.predictionRepo.findByStatus(
-      PredictionStatus.SUCCESS,
-    );
-
-    // 3. Filter berdasarkan threshold dan varietyCode (jika ada)
-    const eligible = allSuccessPredictions.filter((p) => {
-      const meetsThreshold = this.domainService.meetsThreshold(
-        p.confidenceScore,
-        dto.confidenceThreshold,
-      );
-      const meetsVariety =
-        dto.varietyCode === null || p.varietyCode === dto.varietyCode;
-      return meetsThreshold && meetsVariety;
+    const eligiblePredictions = await this.predictionRepo.findEligibleForBulkAdd({
+      minConfidence: dto.confidenceThreshold,
+      varietyCode: dto.varietyCode ?? null,
+      onlyVerified: dto.onlyVerified ?? true,
     });
 
     this.logger.log(
-      `[BulkAdd] dataset=${datasetId}: ${eligible.length} eligible dari ` +
-      `${allSuccessPredictions.length} total SUCCESS`,
+      `[BulkAdd] dataset=${datasetId}: Ditemukan ${eligiblePredictions.length} eligible predictions.`,
     );
 
-    if (eligible.length === 0) {
-      return { added: 0, skipped: 0, evaluated: allSuccessPredictions.length };
+    if (eligiblePredictions.length === 0) {
+      return { added: 0, skipped: 0, evaluated: 0 };
     }
 
-    // 4. Ambil prediction yang sudah ada di dataset (untuk skip duplikat)
     const existingItems = await this.datasetRepo.findItemsByDatasetId(datasetId);
     const existingPredictionIds = new Set(
       existingItems.map((item) => item.predictionId),
     );
 
-    // 5. Filter hanya yang belum ada di dataset
-    const alreadyInDatasetCount = eligible.filter((p) =>
+    const alreadyInDatasetCount = eligiblePredictions.filter((p) =>
       existingPredictionIds.has(p.id),
     ).length;
 
-    const toInsert: CreateDatasetItemData[] = eligible
+    const toInsert: CreateDatasetItemData[] = eligiblePredictions
       .filter((p) => !existingPredictionIds.has(p.id))
       .map((p) => ({ datasetId, predictionId: p.id }));
 
     if (toInsert.length === 0) {
-      this.logger.log(`[BulkAdd] dataset=${datasetId}: semua sudah ada, skip.`);
       return {
         added:     0,
         skipped:   alreadyInDatasetCount,
-        evaluated: allSuccessPredictions.length,
+        evaluated: eligiblePredictions.length,
       };
     }
 
-    const inserted = await this.datasetRepo.createItemsBulk(toInsert);
-    await this.datasetRepo.incrementTotalItems(datasetId, inserted);
+    // FIX: Jika toInsert sangat besar (contoh > 5000 baris), lakukan insert per batch
+    // untuk mencegah query payload limit di MySQL/Postgres.
+    const BATCH_SIZE = 1000;
+    let totalInserted = 0;
 
-    const raceConditionSkipped = toInsert.length - inserted;
+    for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+      const batch = toInsert.slice(i, i + BATCH_SIZE);
+      const inserted = await this.datasetRepo.createItemsBulk(batch);
+      totalInserted += inserted;
+    }
+
+    await this.datasetRepo.incrementTotalItems(datasetId, totalInserted);
+
+    const raceConditionSkipped = toInsert.length - totalInserted;
     const totalSkipped = alreadyInDatasetCount + raceConditionSkipped;
 
-    this.logger.log(
-      `[BulkAdd] dataset=${datasetId}: inserted=${inserted}, skipped=${totalSkipped}`,
-    );
-
     return {
-      added:     inserted,
+      added:     totalInserted,
       skipped:   totalSkipped,
-      evaluated: allSuccessPredictions.length,
+      evaluated: eligiblePredictions.length,
     };
   }
 }

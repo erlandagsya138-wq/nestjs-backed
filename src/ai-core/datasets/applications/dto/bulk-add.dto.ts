@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // ==========================================
@@ -27,6 +27,15 @@ export class BulkAddByConfidenceDto {
   @IsOptional()
   @MaxLength(20)
   readonly varietyCode?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Jika true, hanya memasukkan prediksi yang sudah di-verify benar (isVerified = true) oleh admin.',
+    example: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  readonly onlyVerified?: boolean = true;
 }
 
 // ==========================================
