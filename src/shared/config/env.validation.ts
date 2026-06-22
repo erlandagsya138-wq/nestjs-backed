@@ -81,13 +81,6 @@ class EnvironmentVariables {
   FASTAPI_API_KEY: string = 'your_fastapi_secret_key';
 
   // ── JWT ──────────────────────────────────────────────────────
-  /**
-   * FIX [CRITICAL-04]: Tambah @MinLength(32) untuk memastikan
-   * JWT_SECRET cukup panjang dan tidak mudah di-brute force.
-   *
-   * NIST SP 800-107 merekomendasikan minimal 256-bit (32 byte)
-   * untuk HMAC-SHA256 yang digunakan oleh JWT HS256.
-   */
   @IsString()
   @IsNotEmpty({ message: 'JWT_SECRET wajib diisi' })
   @MinLength(32, {
@@ -99,10 +92,6 @@ class EnvironmentVariables {
   @IsNotEmpty({ message: 'JWT_EXPIRES_IN wajib diisi' })
   JWT_EXPIRES_IN: string = '7d';
 
-  /**
-   * FIX [HIGH-03]: Tambah JWT_ISSUER dan JWT_AUDIENCE untuk
-   * mencegah token confusion attack di sistem multi-service.
-   */
   @IsString()
   @IsNotEmpty({ message: 'JWT_ISSUER wajib diisi' })
   JWT_ISSUER: string = 'capstone-backend';
@@ -121,12 +110,6 @@ class EnvironmentVariables {
   STORAGE_LOCAL_DIR: string = 'uploads';
 
   // ── Market Intelligence ──────────────────────────────────────
-  /**
-   * Secret untuk verifikasi HMAC-SHA256 dari Market Intelligence Agent.
-   * Digunakan oleh HmacSignatureGuard di endpoint POST /ai-integration/market-report.
-   * Harus sama persis dengan nilai yang dikonfigurasi di sisi agent Python.
-   * Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-   */
   @IsString()
   @IsNotEmpty({ message: 'NESTJS_INTERNAL_API_KEY wajib diisi' })
   @MinLength(32, {
