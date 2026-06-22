@@ -17,7 +17,6 @@ import { AuthModule } from './identity/auth/auth.module';
 import { PredictionModule } from './ai-core/predictions/prediction.module';
 import { StorageModule } from './shared/storage/storage.module';
 import { AiIntegrationModule } from './ai-core/ai-integration/ai-integration.module';
-// [FIX BUG-05] Import MarketIntelligenceModule agar endpoint /api/v1/ai-integration/market-report terdaftar
 import { MarketIntelligenceModule } from './ai-core/market-intelligence/market-intelligence.module';
 import { DatasetModule }           from './ai-core/datasets/dataset.module';
 
