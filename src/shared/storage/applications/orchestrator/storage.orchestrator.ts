@@ -24,7 +24,7 @@ export class StorageOrchestrator {
     return this.uploadFile.execute(file, dto, userId);
   }
 
-  delete(fileKey: string): Promise<void> {
-    return this.deleteFile.execute(fileKey);
+  delete(fileKey: string, userId: string): Promise<void> {
+    return this.deleteFile.execute(fileKey, userId);
   }
 }

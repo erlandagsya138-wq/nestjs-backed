@@ -1,18 +1,21 @@
-// src/storage/applications/dto/upload-file.dto.ts
+// src/shared/storage/applications/dto/upload-file.dto.ts
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength, Matches } from 'class-validator';
 
 export type StorageProvider = 'local' | 's3';
 
 export class UploadFileDto {
   @ApiPropertyOptional({
-    description: 'Sub-folder penyimpanan. Contoh: predictions, avatars',
+    description: 'Sub-folder penyimpanan. Hanya boleh berisi huruf, angka, strip, dan underscore.',
     example:     'predictions',
     maxLength:   50,
   })
   @IsString()
   @IsOptional()
   @MaxLength(50)
+  @Matches(/^[a-zA-Z0-9_-]+$/, { 
+    message: 'Context hanya boleh berisi huruf, angka, strip (-), dan underscore (_)'
+  })
   context?: string;
 
   @ApiPropertyOptional({

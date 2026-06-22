@@ -163,7 +163,10 @@ export class StorageController {
     },
   })
   @ApiUnauthorizedResponse({ description: 'Token tidak valid.' })
-  delete(@Param('fileKey') encodedFileKey: string): Promise<void> {
+  delete(
+    @Param('fileKey') encodedFileKey: string,
+    @CurrentUser('sub') userId: string
+  ): Promise<void> {
     let fileKey: string;
     try {
       fileKey = Buffer.from(encodedFileKey, 'base64').toString('utf-8').trim();
@@ -177,6 +180,6 @@ export class StorageController {
       );
     }
 
-    return this.orchestrator.delete(fileKey);
+    return this.orchestrator.delete(fileKey, userId);
   }
 }
