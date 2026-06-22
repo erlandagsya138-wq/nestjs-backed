@@ -16,10 +16,6 @@ export class FindPredictionsByUserUseCase {
     private readonly mapper: PredictionMapper,
   ) {}
 
-  /**
-   * FIX [INFO-03]: Tambah pagination untuk mencegah query berat
-   * pada user dengan ribuan prediksi.
-   */
   async execute(
     userId: string,
     query: FindPredictionsQueryDto,

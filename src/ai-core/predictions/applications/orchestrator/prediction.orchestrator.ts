@@ -5,10 +5,13 @@ import {
   PredictionResponseDto,
 } from '../dto/prediction-response.dto';
 import { FindPredictionsQueryDto } from '../dto/find-predictions-query.dto';
+import { AdminListPredictionsQueryDto, VerifyPredictionDto } from '../dto/admin-prediction.dto';
 import { CreatePredictionUseCase } from '../use-cases/create-prediction.use-case';
 import { FindPredictionByIdUseCase } from '../use-cases/find-prediction-by-id.use-case';
 import { FindPredictionsByUserUseCase } from '../use-cases/find-predictions-by-user.use-case';
 import type { IUploadedFile } from '../../../../shared/storage/domains/mappers/storage.mapper';
+import { VerifyPredictionUseCase } from '../use-cases/verify-prediction.use-case';
+import { FindAllPredictionsAdminUseCase } from '../use-cases/find-all-predictions-admin.use-case';
 
 @Injectable()
 export class PredictionOrchestrator {
@@ -16,10 +19,10 @@ export class PredictionOrchestrator {
     private readonly createPrediction: CreatePredictionUseCase,
     private readonly findById:         FindPredictionByIdUseCase,
     private readonly findByUser:       FindPredictionsByUserUseCase,
+    private readonly findAllAdmin: FindAllPredictionsAdminUseCase,
+    private readonly verifyPrediction: VerifyPredictionUseCase,
   ) {}
 
-  // Signature diubah: file (IUploadedFile) menggantikan CreatePredictionDto.
-  // Controller meneruskan Multer file object langsung ke sini.
   create(
     file:               IUploadedFile,
     authenticatedUserId: string,
@@ -39,5 +42,13 @@ export class PredictionOrchestrator {
     query:  FindPredictionsQueryDto,
   ): Promise<PaginatedPredictionResponseDto> {
     return this.findByUser.execute(userId, query);
+  }
+
+  getAllForAdmin(query: AdminListPredictionsQueryDto): Promise<PaginatedPredictionResponseDto> {
+    return this.findAllAdmin.execute(query);
+  }
+
+  verify(id: string, dto: VerifyPredictionDto): Promise<PredictionResponseDto> {
+    return this.verifyPrediction.execute(id, dto);
   }
 }

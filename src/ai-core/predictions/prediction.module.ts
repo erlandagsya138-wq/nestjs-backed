@@ -13,26 +13,22 @@ import { FindPredictionByIdUseCase } from './applications/use-cases/find-predict
 import { FindPredictionsByUserUseCase } from './applications/use-cases/find-predictions-by-user.use-case';
 import { PredictionOrchestrator } from './applications/orchestrator/prediction.orchestrator';
 import { PredictionController } from './interface/http/prediction.controller';
+import { AdminPredictionController } from './interface/http/admin-prediction.controller';
 import { PredictionCreatedLogListener } from './infrastructures/listeners/prediction-created.listener';
 import { AiIntegrationModule } from '../ai-integration/ai-integration.module';
-
-// StorageModule di-import agar UploadFileUseCase tersedia untuk di-inject
-// ke CreatePredictionUseCase. Ini memungkinkan 1 request POST /predictions
-// menjalankan upload + predict secara sequential dalam satu transaksi logis.
 import { StorageModule } from '../../shared/storage/storage.module';
 import { MarketIntelligenceModule } from '../market-intelligence/market-intelligence.module';
+import { FindAllPredictionsAdminUseCase } from './applications/use-cases/find-all-predictions-admin.use-case';
+import { VerifyPredictionUseCase } from './applications/use-cases/verify-prediction.use-case';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([PredictionEntity]),
     forwardRef(() => AiIntegrationModule),
-
-    // StorageModule menyediakan: UploadFileUseCase, StorageDomainService,
-    // StorageAdapterProvider, dan StoredFileRepository
     StorageModule,
     MarketIntelligenceModule,
   ],
-  controllers: [PredictionController],
+  controllers: [PredictionController, AdminPredictionController],
   providers: [
     { provide: PREDICTION_REPOSITORY_TOKEN, useClass: PredictionRepository },
     PredictionDomainService,
@@ -43,6 +39,8 @@ import { MarketIntelligenceModule } from '../market-intelligence/market-intellig
     FindPredictionsByUserUseCase,
     PredictionOrchestrator,
     PredictionCreatedLogListener,
+    FindAllPredictionsAdminUseCase,
+    VerifyPredictionUseCase,
   ],
   exports: [
     PREDICTION_REPOSITORY_TOKEN,

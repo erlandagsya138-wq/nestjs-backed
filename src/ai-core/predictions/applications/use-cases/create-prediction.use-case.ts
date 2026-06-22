@@ -32,7 +32,7 @@ export class CreatePredictionUseCase {
     private readonly eventEmitter: EventEmitter2,
 
     private readonly uploadFileUseCase: UploadFileUseCase,
-    
+
     private readonly marketIntelligenceOrchestrator: MarketIntelligenceOrchestrator,
 
     @Inject(forwardRef(() => AiIntegrationOrchestrator))
@@ -72,12 +72,18 @@ export class CreatePredictionUseCase {
     }
 
     // ── Step 1: Upload file & persist StoredFileEntity ───────────────────
-    // UploadFileUseCase menangani: validasi mime+size, upload ke disk/S3,
-    // persist ke stored_files, dan return DTO dengan storedFileId & imageUrl.
     let storedFileId: string;
     let imageUrl:     string;
     let imageBuffer:  Buffer;
     let imageMimeType: string;
+
+    // ── Step 3: Validasi MIME type ────────────────────────────────────────
+    const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      throw new UnprocessableEntityException(
+        `Tipe file '${file.mimetype}' tidak didukung. Harap unggah gambar JPG/PNG/WebP.`
+      );
+    }
 
     try {
       const uploadResult = await this.uploadFileUseCase.execute(
@@ -87,12 +93,9 @@ export class CreatePredictionUseCase {
       );
       storedFileId  = uploadResult.storedFileId;
       imageUrl      = uploadResult.imageUrl;
-      // Buffer dan mimeType diambil dari file Multer — sudah ada di memory,
-      // tidak perlu baca ulang dari disk.
       imageBuffer   = file.buffer;
       imageMimeType = file.mimetype;
     } catch (err: unknown) {
-      // Re-throw — UploadFileUseCase sudah menghasilkan HTTP exception yang tepat
       throw err;
     }
 
@@ -122,14 +125,6 @@ export class CreatePredictionUseCase {
         new Date(),
       ),
     );
-
-    // ── Step 3: Validasi MIME type ────────────────────────────────────────
-    const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-    if (!ALLOWED_MIME_TYPES.has(imageMimeType)) {
-      const reason = `MIME type '${imageMimeType}' tidak didukung`;
-      await this.predictionRepo.markAsFailed(prediction.id, reason).catch(() => {});
-      throw new UnprocessableEntityException(reason);
-    }
 
     // ── Step 4: Kirim ke AI ───────────────────────────────────────────────
     this.logger.log(`[Create] Mengirim ke AI → id=${prediction.id}`);

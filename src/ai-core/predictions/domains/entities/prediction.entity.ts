@@ -48,7 +48,6 @@ export class PredictionEntity {
   @Column({ type: 'varchar', length: 36, nullable: false })
   userId: string = '';
 
-  // FK ke stored_files — relasi 1-to-1 (fix M5 dari Phase 1)
   @Column({ type: 'varchar', length: 36, nullable: false, unique: true })
   storedFileId: string = '';
 
@@ -68,7 +67,6 @@ export class PredictionEntity {
   @Column({ type: 'text', nullable: true, default: null })
   description: string | null = null;
 
-  // decimal(5,4) → nilai 0.0000 s/d 0.9999, cukup untuk confidence score
   @Column({
     type:        'decimal',
     precision:   5,
@@ -83,8 +81,6 @@ export class PredictionEntity {
   @Column({ type: 'boolean', nullable: true, default: null })
   imageEnhanced: boolean | null = null;
 
-  // Diubah dari float ke decimal(10,2) agar tidak ada floating point drift
-  // saat menyimpan nilai seperti 150.00 ms (fix M4 dari Phase 1)
   @Column({
     type:        'decimal',
     precision:   10,
@@ -109,8 +105,6 @@ export class PredictionEntity {
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   aiRequestId: string | null = null;
 
-  // imageUrl dipertahankan sebagai denormalisasi untuk kemudahan akses
-  // tanpa JOIN ke stored_files di setiap query
   @Column({ type: 'varchar', length: 512, nullable: false })
   imageUrl: string = '';
 
@@ -126,9 +120,6 @@ export class PredictionEntity {
   errorMessage: string | null = null;
 
   // ── Admin Verification Fields (Human-in-the-loop) ────────────
-  // isVerified: null  = belum diverifikasi admin
-  // isVerified: true  = AI benar, disetujui admin
-  // isVerified: false = AI salah, ditolak admin
   @Column({ type: 'boolean', nullable: true, default: null })
   isVerified: boolean | null = null;
 
@@ -149,8 +140,6 @@ export class PredictionEntity {
   @JoinColumn({ name: 'userId' })
   user!: Relation<UserEntity>;
 
-  // Sisi owning dari relasi 1-to-1 dengan StoredFile
-  // (FK storedFileId ada di tabel ini)
   @OneToOne(() => StoredFileEntity, (sf) => sf.prediction, {
     onDelete: 'RESTRICT',
     nullable: false,

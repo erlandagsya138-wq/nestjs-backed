@@ -21,13 +21,24 @@ export interface PredictionResultPayload {
   aiRequestId:     string | null;
 }
 
-// Data wajib saat membuat prediction baru.
-// storedFileId sekarang required — tidak boleh ada prediction tanpa
-// referensi ke file yang menghasilkannya.
+export interface AdminPredictionFilter {
+  skip: number;
+  limit: number;
+  status?: string;
+  varietyCode?: string;
+  isVerified?: boolean;
+}
+
 export interface CreatePredictionData {
   userId:        string;
   storedFileId:  string;
   imageUrl:      string;
+}
+
+export interface BulkAddFilter {
+  minConfidence: number;
+  varietyCode: string | null;
+  onlyVerified: boolean;
 }
 
 export interface IPredictionRepository {
@@ -38,12 +49,18 @@ export interface IPredictionRepository {
     skip:   number,
     limit:  number,
   ): Promise<[PredictionEntity[], number]>;
-  // Signature diperketat: terima CreatePredictionData bukan Partial<PredictionEntity>
-  // agar storedFileId tidak bisa luput (compile-time enforcement)
+  findEligibleForBulkAdd(filter: BulkAddFilter): Promise<PredictionEntity[]>;
   create(data: CreatePredictionData): Promise<PredictionEntity>;
   updateResult(id: string, result: PredictionResultPayload): Promise<PredictionEntity>;
   markAsFailed(id: string, reason: string): Promise<void>;
   findByStatus(status: string): Promise<PredictionEntity[]>;
+  findAllForAdmin(filter: AdminPredictionFilter): Promise<[PredictionEntity[], number]>;
+  verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity>;
+}
+
+export interface VerifyPredictionData {
+  isVerified: boolean;
+  adminNote?: string;
 }
 
 export const PREDICTION_REPOSITORY_TOKEN = Symbol('IPredictionRepository');

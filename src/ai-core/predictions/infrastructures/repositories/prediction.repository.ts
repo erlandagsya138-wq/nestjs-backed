@@ -7,6 +7,7 @@ import {
   PredictionEntity,
   PredictionStatus,
 } from '../../domains/entities/prediction.entity';
+import { BulkAddFilter } from './prediction.repository.interface';
 import {
   IPredictionRepository,
   PredictionResultPayload,
@@ -45,8 +46,6 @@ export class PredictionRepository implements IPredictionRepository {
   }
 
   async create(data: CreatePredictionData): Promise<PredictionEntity> {
-    // Guard — semua field wajib (seharusnya sudah dicek di use case,
-    // tapi defense-in-depth di repository layer)
     if (!data.userId.trim()) {
       throw new InternalServerErrorException(
         'Tidak dapat membuat prediction: userId kosong.',
@@ -73,7 +72,7 @@ export class PredictionRepository implements IPredictionRepository {
       .values({
         id,
         userId:       data.userId.trim(),
-        storedFileId: data.storedFileId.trim(), // ← sebelumnya tidak ada
+        storedFileId: data.storedFileId.trim(),
         imageUrl:     data.imageUrl.trim(),
         status:       PredictionStatus.PENDING,
       })
@@ -139,5 +138,63 @@ export class PredictionRepository implements IPredictionRepository {
       where: { status: status as PredictionStatus },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findAllForAdmin(filter: import('./prediction.repository.interface').AdminPredictionFilter): Promise<[PredictionEntity[], number]> {
+    const qb = this.ormRepo.createQueryBuilder('p');
+
+    if (filter.status) {
+      qb.andWhere('p.status = :status', { status: filter.status });
+    }
+    if (filter.varietyCode) {
+      qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
+    }
+    if (filter.isVerified !== undefined) {
+      if (filter.isVerified === null) {
+        qb.andWhere('p.isVerified IS NULL');
+      } else {
+        qb.andWhere('p.isVerified = :isVerified', { isVerified: filter.isVerified });
+      }
+    }
+
+    qb.orderBy('p.createdAt', 'DESC')
+      .skip(filter.skip)
+      .take(filter.limit);
+
+    return qb.getManyAndCount();
+  }
+
+  async verify(id: string, data: import('./prediction.repository.interface').VerifyPredictionData): Promise<PredictionEntity> {
+    await this.ormRepo.update(id, {
+      isVerified: data.isVerified,
+      adminNote: data.adminNote ?? null,
+      verifiedAt: new Date(),
+    });
+
+    const updated = await this.findById(id);
+    if (!updated) throw new InternalServerErrorException(`Prediction id='${id}' tidak ditemukan setelah verifikasi.`);
+    return updated;
+  }
+
+  async findEligibleForBulkAdd(filter: BulkAddFilter): Promise<PredictionEntity[]> {
+    const qb = this.ormRepo.createQueryBuilder('prediction')
+      .where('prediction.status = :status', { status: PredictionStatus.SUCCESS })
+      .andWhere('prediction.confidenceScore >= :minConfidence', {
+        minConfidence: filter.minConfidence
+      });
+
+    if (filter.varietyCode !== null) {
+      qb.andWhere('prediction.varietyCode = :varietyCode', {
+        varietyCode: filter.varietyCode
+      });
+    }
+
+    if (filter.onlyVerified) {
+      qb.andWhere('prediction.isVerified = :isVerified', {
+        isVerified: true,
+      });
+    }
+
+    return qb.getMany();
   }
 }

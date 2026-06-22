@@ -31,10 +31,21 @@ export class PredictionExceptionFilter implements ExceptionFilter {
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const exceptionResponse = exception.getResponse();
-    const message =
+    let message =
       typeof exceptionResponse === 'object' && 'message' in exceptionResponse
         ? (exceptionResponse as { message: string | string[] }).message
         : exception.message;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(
+        `[Predictions] SYSTEM ERROR ${req.method} ${req.url} → Asli: ${JSON.stringify(message)} | Stack: ${exception.stack}`
+      );
+      message = 'Terjadi kesalahan internal saat memproses prediksi. Silakan coba lagi nanti.';
+    } else {
+      this.logger.warn(
+        `[${req.method}] ${req.url} → ${status}: ${JSON.stringify(message)}`,
+      );
+    }
 
     const body: ErrorResponseBody = {
       statusCode: status,

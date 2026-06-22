@@ -21,7 +21,6 @@ export class PredictionMapper {
       status:          entity.status,
       errorMessage:    entity.errorMessage,
       createdAt:       entity.createdAt,
-      // ── BARU ──
       allVarieties: entity.allVarieties ?? null,
       modelVersion: entity.modelVersion,
       aiRequestId:  entity.aiRequestId,
