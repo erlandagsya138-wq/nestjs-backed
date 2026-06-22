@@ -15,6 +15,7 @@ interface ErrorResponse {
   path: string;
   message: string | string[];
   error: string;
+  module: 'user';
 }
 
 @Catch(HttpException)
@@ -31,17 +32,29 @@ export class UserExceptionFilter implements ExceptionFilter {
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const exceptionResponse = exception.getResponse();
-    const message =
+    let message =
       typeof exceptionResponse === 'object' && 'message' in exceptionResponse
         ? (exceptionResponse as { message: string | string[] }).message
         : exception.message;
+
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(
+        `[Users] SYSTEM ERROR ${request.method} ${request.url} → Asli: ${JSON.stringify(message)} | Stack: ${exception.stack}`
+      );
+      message = 'Terjadi kesalahan internal pada layanan profil pengguna. Silakan coba lagi.';
+    } else {
+      this.logger.warn(
+        `[Auth] ${request.method} ${request.url} → ${status}: ${JSON.stringify(message)}`,
+      );
+    }
 
     const body: ErrorResponse = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       message,
-      error: exception.name,
+      error: status === HttpStatus.INTERNAL_SERVER_ERROR ? 'Internal Server Error' : exception.name,
+      module: 'user',
     };
 
     this.logger.warn(

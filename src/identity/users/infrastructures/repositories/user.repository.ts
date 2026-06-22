@@ -16,10 +16,18 @@ export class UserRepository implements IUserRepository {
     return this.ormRepo.findOne({ where: { id } });
   }
 
+  async findByIdWithPassword(id: string): Promise<UserEntity | null> {
+    return this.ormRepo
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.id = :id', { id })
+      .getOne();
+  }
+
   async findByEmail(email: string): Promise<UserEntity | null> {
     return this.ormRepo
       .createQueryBuilder('user')
-      .addSelect('user.password') // password di-select karena select:false
+      .addSelect('user.password')
       .where('user.email = :email', { email })
       .getOne();
   }

@@ -1,5 +1,5 @@
 // src/users/applications/use-cases/update-user.use-case.ts
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { UserResponseDto } from '../dto/user-response.dto';
 import { UserDomainService } from '../../domains/services/user-domain.service';
@@ -23,7 +23,7 @@ export class UpdateUserUseCase {
     dto: UpdateUserDto,
     requestingUserId: string,
   ): Promise<UserResponseDto> {
-    const user = await this.userRepo.findById(id);
+    const user = await this.userRepo.findByIdWithPassword(id);
 
     this.validator.assertExists(user, id);
 
@@ -41,7 +41,13 @@ export class UpdateUserUseCase {
       updatePayload.fullName = dto.fullName ?? null;
     }
 
-    if (dto.newPassword && dto.currentPassword) {
+    if (dto.newPassword || dto.currentPassword) {
+      if (!dto.newPassword || !dto.currentPassword) {
+        throw new BadRequestException(
+          'currentPassword dan newPassword harus diisi bersamaan untuk mengganti password.'
+        );
+      }
+
       await this.validator.assertPasswordMatch(
         dto.currentPassword,
         user.password,
