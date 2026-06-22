@@ -94,6 +94,8 @@ Confidence score dikembalikan dalam rentang **0.0000 – 1.0000** (4 desimal).
     .addTag('Users', 'Manajemen profil pengguna (lihat & update)')
     .addTag('Predictions', 'Submit gambar durian dan ambil hasil klasifikasi AI')
     .addTag('Storage', 'Upload dan hapus file gambar ke local/S3 storage')
+    .addTag('Admin — Datasets', 'Manajemen dataset durian untuk keperluan AI')
+    .addTag('Admin — Predictions', 'Validasi dan monitoring hasil prediksi oleh Admin')
     .addTag(
       'AI Health',
       'Status koneksi dan kesiapan model AI — **tidak memerlukan JWT**',
