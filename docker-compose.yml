@@ -1,15 +1,15 @@
-version: '3.8'
-
 services:
-  nestjs-backend:
+  backend-nestjs:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: durian-nestjs-backend
-    restart: always
+    restart: unless-stopped
     ports:
       - "3001:3001"
     env_file:
       - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - ./uploads:/app/uploads

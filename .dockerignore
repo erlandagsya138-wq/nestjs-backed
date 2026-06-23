@@ -1,6 +1,11 @@
+.git
+.gitignore
 node_modules/
 dist/
 npm-debug.log
 .env
-.git
-.vscode
+.env.*
+.prettierrc
+eslint.config.cjs
+test/
+uploads/
