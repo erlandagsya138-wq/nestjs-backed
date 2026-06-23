@@ -197,4 +197,14 @@ export class PredictionRepository implements IPredictionRepository {
 
     return qb.getMany();
   }
+
+  async findVerifiedForExport(): Promise<PredictionEntity[]> {
+    return this.ormRepo.find({
+      where: {
+        status: PredictionStatus.SUCCESS,
+        isVerified: true
+      },
+      select: ['id', 'varietyCode', 'imageUrl']
+    })
+  }
 }

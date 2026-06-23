@@ -126,16 +126,50 @@ export class CreatePredictionUseCase {
       ),
     );
 
-    // ── Step 4: Kirim ke AI ───────────────────────────────────────────────
+    // ── Step 4: Kirim ke AI dengan Type-Safe Error Handling ───────────────
     this.logger.log(`[Create] Mengirim ke AI → id=${prediction.id}`);
 
-    await this.aiOrchestrator.process({
-      predictionId:     prediction.id,
-      userId:           authenticatedUserId,
-      imageBuffer,
-      imageMimeType,
-      originalFileName: this.aiDomainService.buildFileName(prediction.id, imageMimeType),
-    });
+    try {
+      await this.aiOrchestrator.process({
+        predictionId:     prediction.id,
+        userId:           authenticatedUserId,
+        imageBuffer,
+        imageMimeType,
+        originalFileName: this.aiDomainService.buildFileName(prediction.id, imageMimeType),
+      });
+    } catch (error: unknown) {
+      // Default error message
+      let aiErrorMessage = 'Gambar ditolak oleh sistem.';
+
+      // Fallback ke standard Error object jika ada
+      if (error instanceof Error) {
+        aiErrorMessage = error.message;
+      }
+
+      // Safe extraction untuk struktur AxiosError / HttpException
+      if (typeof error === 'object' && error !== null) {
+        const errObj = error as Record<string, unknown>;
+        const response = errObj.response as Record<string, unknown> | undefined;
+        const data = response?.data as Record<string, unknown> | undefined;
+
+        if (typeof data?.detail === 'string') {
+          aiErrorMessage = data.detail;
+        } else if (typeof data?.message === 'string') {
+          aiErrorMessage = data.message;
+        } else if (typeof errObj.message === 'string') {
+          aiErrorMessage = errObj.message;
+        }
+      }
+
+      this.logger.warn(`[Create] AI menolak gambar id=${prediction.id}: ${aiErrorMessage}`);
+
+      // Simpan alasan penolakan ke database (status otomatis FAILED)
+      await this.predictionRepo.markAsFailed(prediction.id, aiErrorMessage);
+
+      // Kembalikan DTO dengan status FAILED tanpa membuat server crash (HTTP 500)
+      const failedData = await this.predictionRepo.findById(prediction.id);
+      return this.mapper.toResponseDto(failedData!);
+    }
 
     // ── Step 5: Fetch hasil akhir dari DB ─────────────────────────────────
     const final = await this.predictionRepo.findById(prediction.id);
@@ -151,8 +185,8 @@ export class CreatePredictionUseCase {
       try {
         const priceSummary = await this.marketIntelligenceOrchestrator.getPriceSummaryByVariety(final.varietyCode);
         responseDto.marketPriceSummary = priceSummary;
-      } catch (error) {
-        this.logger.error(`Gagal mengambil harga pasar untuk ${final.varietyCode}`, error);
+      } catch (error: unknown) {
+        this.logger.error(`Gagal mengambil harga pasar untuk ${final.varietyCode}`, error instanceof Error ? error.stack : undefined);
       }
     }
 

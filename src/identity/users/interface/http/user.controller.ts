@@ -11,6 +11,7 @@ import {
   Patch,
   UseFilters,
   UseGuards,
+  Header,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -41,6 +42,7 @@ export class UserController {
   // ── GET /users/me ──────────────────────────────────────────────────────────
 
   @Get('me')
+  @Header('Cache-Control', 'private, max-age=60')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:     'Lihat profil saya',
@@ -58,6 +60,7 @@ export class UserController {
   // ── GET /users/:id ─────────────────────────────────────────────────────────
 
   @Get(':id')
+  @Header('Cache-Control', 'private, max-age=60')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:     'Lihat profil berdasarkan ID',

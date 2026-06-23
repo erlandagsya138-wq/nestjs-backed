@@ -20,6 +20,7 @@ import { StorageModule } from '../../shared/storage/storage.module';
 import { MarketIntelligenceModule } from '../market-intelligence/market-intelligence.module';
 import { FindAllPredictionsAdminUseCase } from './applications/use-cases/find-all-predictions-admin.use-case';
 import { VerifyPredictionUseCase } from './applications/use-cases/verify-prediction.use-case';
+import { ExportVerifiedDatasetUseCase } from './applications/use-cases/export-verified-dataset.use-case';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { VerifyPredictionUseCase } from './applications/use-cases/verify-predict
     PredictionCreatedLogListener,
     FindAllPredictionsAdminUseCase,
     VerifyPredictionUseCase,
+    ExportVerifiedDatasetUseCase,
   ],
   exports: [
     PREDICTION_REPOSITORY_TOKEN,

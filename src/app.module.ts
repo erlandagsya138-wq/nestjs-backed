@@ -18,7 +18,6 @@ import { PredictionModule } from './ai-core/predictions/prediction.module';
 import { StorageModule } from './shared/storage/storage.module';
 import { AiIntegrationModule } from './ai-core/ai-integration/ai-integration.module';
 import { MarketIntelligenceModule } from './ai-core/market-intelligence/market-intelligence.module';
-import { DatasetModule }           from './ai-core/datasets/dataset.module';
 
 // ── Guards ────────────────────────────────────────────────────
 import { JwtAuthGuard } from './identity/auth/interface/guards/jwt-auth.guard';
@@ -28,8 +27,6 @@ import { UserEntity } from './identity/users/domains/entities/user.entity';
 import { PredictionEntity } from './ai-core/predictions/domains/entities/prediction.entity';
 import { MarketPriceEntity } from './ai-core/market-intelligence/domains/entities/market-price.entity';
 import { AgentRunEntity }    from './ai-core/market-intelligence/domains/entities/agent-run.entity';
-import { DatasetEntity }     from './ai-core/datasets/domains/entities/dataset.entity';
-import { DatasetItemEntity } from './ai-core/datasets/domains/entities/dataset-item.entity';
 
 @Module({
   imports: [
@@ -98,8 +95,6 @@ import { DatasetItemEntity } from './ai-core/datasets/domains/entities/dataset-i
             MarketPriceEntity,
             StoredFileEntity,
             AgentRunEntity,
-            DatasetEntity,
-            DatasetItemEntity,
           ],
           synchronize: isSynchronizeEnabled,
           logging: nodeEnv === 'development' ? ['query', 'error'] : ['error'],
@@ -124,7 +119,6 @@ import { DatasetItemEntity } from './ai-core/datasets/domains/entities/dataset-i
     PredictionModule,
     AiIntegrationModule,
     MarketIntelligenceModule,
-    DatasetModule,
   ],
 
   providers: [

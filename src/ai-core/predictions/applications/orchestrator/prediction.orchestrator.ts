@@ -1,5 +1,6 @@
 // src/ai-core/predictions/applications/orchestrator/prediction.orchestrator.ts
 import { Injectable } from '@nestjs/common';
+import { Response } from 'express';
 import {
   PaginatedPredictionResponseDto,
   PredictionResponseDto,
@@ -12,6 +13,16 @@ import { FindPredictionsByUserUseCase } from '../use-cases/find-predictions-by-u
 import type { IUploadedFile } from '../../../../shared/storage/domains/mappers/storage.mapper';
 import { VerifyPredictionUseCase } from '../use-cases/verify-prediction.use-case';
 import { FindAllPredictionsAdminUseCase } from '../use-cases/find-all-predictions-admin.use-case';
+import { ExportVerifiedDatasetUseCase } from '../use-cases/export-verified-dataset.use-case';
+
+export type MobilePredictionItemDto = Pick<
+  PredictionResponseDto,
+  'id' | 'varietyName' | 'confidenceScore' | 'imageUrl' | 'status' | 'createdAt'
+>;
+
+export interface PaginatedMobilePredictionResponseDto extends Omit<PaginatedPredictionResponseDto, 'data'> {
+  data: MobilePredictionItemDto[];
+}
 
 @Injectable()
 export class PredictionOrchestrator {
@@ -19,8 +30,9 @@ export class PredictionOrchestrator {
     private readonly createPrediction: CreatePredictionUseCase,
     private readonly findById:         FindPredictionByIdUseCase,
     private readonly findByUser:       FindPredictionsByUserUseCase,
-    private readonly findAllAdmin: FindAllPredictionsAdminUseCase,
+    private readonly findAllAdmin:     FindAllPredictionsAdminUseCase,
     private readonly verifyPrediction: VerifyPredictionUseCase,
+    private readonly exportDatasetUseCase: ExportVerifiedDatasetUseCase,
   ) {}
 
   create(
@@ -31,17 +43,34 @@ export class PredictionOrchestrator {
   }
 
   getById(
-    id:              string,
+    id:               string,
     requestingUserId: string,
   ): Promise<PredictionResponseDto> {
     return this.findById.execute(id, requestingUserId);
   }
 
-  getAllByUser(
+  async getAllByUser(
     userId: string,
     query:  FindPredictionsQueryDto,
-  ): Promise<PaginatedPredictionResponseDto> {
-    return this.findByUser.execute(userId, query);
+  ): Promise<PaginatedMobilePredictionResponseDto> {
+
+    const paginatedResult: PaginatedPredictionResponseDto = await this.findByUser.execute(userId, query);
+
+    const dietItems: MobilePredictionItemDto[] = paginatedResult.data.map((item: PredictionResponseDto) => {
+      return {
+        id: item.id,
+        varietyName: item.varietyName,
+        confidenceScore: item.confidenceScore,
+        imageUrl: item.imageUrl,
+        status: item.status,
+        createdAt: item.createdAt,
+      };
+    });
+
+    return {
+      ...paginatedResult,
+      data: dietItems,
+    };
   }
 
   getAllForAdmin(query: AdminListPredictionsQueryDto): Promise<PaginatedPredictionResponseDto> {
@@ -50,5 +79,9 @@ export class PredictionOrchestrator {
 
   verify(id: string, dto: VerifyPredictionDto): Promise<PredictionResponseDto> {
     return this.verifyPrediction.execute(id, dto);
+  }
+
+  exportVerifiedDataset(res: Response): Promise<void> {
+    return this.exportDatasetUseCase.execute(res);
   }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Query, UseFilters, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Query, UseFilters, UseGuards, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PredictionOrchestrator } from '../../applications/orchestrator/prediction.orchestrator';
 import { AdminListPredictionsQueryDto, VerifyPredictionDto } from '../../applications/dto/admin-prediction.dto';
@@ -8,6 +8,7 @@ import { JwtAuthGuard } from '../../../../identity/auth/interface/guards/jwt-aut
 import { RolesGuard } from '../../../../identity/auth/interface/guards/roles.guard';
 import { UserRole } from '../../../../identity/users/domains/entities/user.entity';
 import { Roles } from '../../../../identity/auth/interface/decorators/roles.decorator';
+import type { Response } from 'express';
 
 @ApiTags('Admin — Predictions')
 @ApiBearerAuth('JWT')
@@ -17,6 +18,12 @@ import { Roles } from '../../../../identity/auth/interface/decorators/roles.deco
 @Controller('admin/predictions')
 export class AdminPredictionController {
   constructor(private readonly orchestrator: PredictionOrchestrator) {}
+
+  @Get('export')
+  @ApiOperation({ summary: 'Unduh dataset terverifikasi dalam format ZIP' })
+  exportDataset(@Res() res: Response): Promise<void> {
+    return this.orchestrator.exportVerifiedDataset(res);
+  }
 
   @Get()
   @HttpCode(HttpStatus.OK)

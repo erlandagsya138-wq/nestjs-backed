@@ -5,6 +5,18 @@ import { PredictionEntity } from '../entities/prediction.entity';
 
 @Injectable()
 export class PredictionMapper {
+
+  toMobileListDto(entity: PredictionEntity) {
+    return {
+      id: entity.id,
+      varietyName: entity.varietyName,
+      confidenceScore: entity.confidenceScore,
+      imageUrl: entity.imageUrl,
+      status: entity.status,
+      createdAt: entity.createdAt,
+    };
+  }
+
   toResponseDto(entity: PredictionEntity): PredictionResponseDto {
     return {
       id:              entity.id,
@@ -21,9 +33,9 @@ export class PredictionMapper {
       status:          entity.status,
       errorMessage:    entity.errorMessage,
       createdAt:       entity.createdAt,
-      allVarieties: entity.allVarieties ?? null,
-      modelVersion: entity.modelVersion,
-      aiRequestId:  entity.aiRequestId,
+      allVarieties:    entity.allVarieties ?? null,
+      modelVersion:    entity.modelVersion,
+      aiRequestId:     entity.aiRequestId,
     };
   }
 

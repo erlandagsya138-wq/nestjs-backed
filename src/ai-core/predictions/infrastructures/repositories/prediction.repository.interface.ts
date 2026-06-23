@@ -55,6 +55,7 @@ export interface IPredictionRepository {
   markAsFailed(id: string, reason: string): Promise<void>;
   findByStatus(status: string): Promise<PredictionEntity[]>;
   findAllForAdmin(filter: AdminPredictionFilter): Promise<[PredictionEntity[], number]>;
+  findVerifiedForExport(): Promise<PredictionEntity[]>;
   verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity>;
 }
 

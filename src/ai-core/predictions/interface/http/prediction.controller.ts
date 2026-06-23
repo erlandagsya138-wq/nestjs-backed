@@ -15,6 +15,7 @@ import {
   UseGuards,
   UseInterceptors,
   UnprocessableEntityException,
+  Header,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -43,10 +44,8 @@ import { FindPredictionsQueryDto } from '../../applications/dto/find-predictions
 import { PredictionExceptionFilter } from '../filters/prediction-exception.filter';
 import { JwtAuthGuard } from '../../../../identity/auth/interface/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../identity/auth/interface/decorators/current-user.decorator';
+import { PaginatedMobilePredictionResponseDto } from '../../applications/orchestrator/prediction.orchestrator';
 
-// Multer memory storage — file buffer tersedia di memory untuk langsung
-// dikirim ke UploadFileUseCase tanpa perlu baca ulang dari disk.
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
 const memoryStorage = multer.memoryStorage();
 
 @ApiTags('Predictions')
@@ -63,13 +62,11 @@ export class PredictionController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  // FileInterceptor memproses field 'file' dari multipart/form-data
   @UseInterceptors(
     FileInterceptor('file', {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       storage: memoryStorage,
       limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB — sama dengan StorageModule
+        fileSize: 10 * 1024 * 1024,
         files:    1,
       },
     }),
@@ -148,6 +145,7 @@ export class PredictionController {
   // ── List my predictions ────────────────────────────────────────────────────
 
   @Get('user/me')
+  @Header('Cache-Control', 'private, max-age=60')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:     'Daftar prediksi saya',
@@ -161,7 +159,7 @@ export class PredictionController {
   getAllByUser(
     @CurrentUser('sub') authenticatedUserId: string,
     @Query() query: FindPredictionsQueryDto,
-  ): Promise<PaginatedPredictionResponseDto> {
+  ): Promise<PaginatedMobilePredictionResponseDto> {
     if (!authenticatedUserId?.trim()) {
       throw new InternalServerErrorException(
         'Gagal mengidentifikasi user dari token. Coba logout dan login kembali.',
@@ -173,6 +171,7 @@ export class PredictionController {
   // ── Get by ID ──────────────────────────────────────────────────────────────
 
   @Get(':id')
+  @Header('Cache-Control', 'private, max-age=60')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:     'Detail prediksi',
