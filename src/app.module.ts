@@ -100,6 +100,11 @@ import { AgentRunEntity }    from './ai-core/market-intelligence/domains/entitie
           logging: nodeEnv === 'development' ? ['query', 'error'] : ['error'],
           timezone: '+07:00',
           charset: 'utf8mb4',
+
+          ssl: {
+            rejectUnauthorized: true,
+          },
+
           extra: {
             connectionLimit: config.get<number>('DB_CONNECTION_LIMIT', 10),
             acquireTimeout: 10_000,
