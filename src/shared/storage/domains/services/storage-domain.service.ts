@@ -12,7 +12,7 @@ export class StorageDomainService {
     'image/jpg',
   ] as const;
 
-  readonly MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+  readonly MAX_SIZE_BYTES = 10 * 1024 * 1024; // 5MB
 
   /**
    * Generate file key yang unik dan terstruktur.

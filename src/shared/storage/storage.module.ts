@@ -26,7 +26,6 @@ import { StorageMapper } from './domains/mappers/storage.mapper';
 
 // Use Cases
 import { UploadFileUseCase } from './applications/use-cases/upload-file.use-case';
-import { DeleteFileUseCase } from './applications/use-cases/delete-file.use-case';
 
 // Orchestrator
 import { StorageOrchestrator } from './applications/orchestrator/storage.orchestrator';
@@ -89,7 +88,6 @@ import { AuthModule } from '../../identity/auth/auth.module';
 
     // ── Application Layer ──────────────────────────────────────
     UploadFileUseCase,
-    DeleteFileUseCase,
     StorageOrchestrator,
 
     // ── Guards ─────────────────────────────────────────────────
@@ -109,7 +107,6 @@ import { AuthModule } from '../../identity/auth/auth.module';
     LocalStorageAdapter,
     S3StorageAdapter,
     UploadFileUseCase,
-    DeleteFileUseCase,
   ],
 })
 export class StorageModule {}
