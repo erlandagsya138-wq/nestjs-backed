@@ -1,5 +1,5 @@
 // src/predictions/applications/use-cases/find-predictions-by-user.use-case.ts
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PaginatedPredictionResponseDto } from '../dto/prediction-response.dto';
 import { FindPredictionsQueryDto } from '../dto/find-predictions-query.dto';
 import { PredictionMapper } from '../../domains/mappers/prediction.mapper';
@@ -7,13 +7,16 @@ import {
   type IPredictionRepository,
   PREDICTION_REPOSITORY_TOKEN,
 } from '../../infrastructures/repositories/prediction.repository.interface';
+import { MarketIntelligenceOrchestrator } from '../../../market-intelligence/applications/orchestrator/market-intelligence.orchestrator';
 
 @Injectable()
 export class FindPredictionsByUserUseCase {
+  private readonly logger = new Logger(FindPredictionsByUserUseCase.name);
   constructor(
     @Inject(PREDICTION_REPOSITORY_TOKEN)
     private readonly predictionRepo: IPredictionRepository,
     private readonly mapper: PredictionMapper,
+    private readonly marketIntelligenceOrchestrator: MarketIntelligenceOrchestrator,
   ) {}
 
   async execute(
@@ -27,9 +30,26 @@ export class FindPredictionsByUserUseCase {
       await this.predictionRepo.findAllByUserIdPaginated(userId, skip, limit);
 
     const totalPages = Math.ceil(total / limit);
+    const data = this.mapper.toResponseDtoList(predictions);
+
+    await Promise.all(
+      data.map(async (item) => {
+        if (item.status === 'SUCCESS' && item.varietyCode) {
+          try {
+            const priceSummary = await this.marketIntelligenceOrchestrator.getPriceSummaryByVariety(item.varietyCode);
+            item.marketPriceSummary = priceSummary || {
+              minPriceKg: 0, maxPriceKg: 0, avgPriceKg: 0, totalListings: 0
+            };
+          } catch (err) {
+            this.logger.error(`Gagal ambil harga di list untuk ${item.varietyCode}`);
+            item.marketPriceSummary = null;
+          }
+        }
+      }),
+    );
 
     return {
-      data: this.mapper.toResponseDtoList(predictions),
+      data,
       total,
       page,
       limit,

@@ -171,7 +171,7 @@ export class PredictionController {
   // ── Get by ID ──────────────────────────────────────────────────────────────
 
   @Get(':id')
-  @Header('Cache-Control', 'private, max-age=60')
+  // @Header('Cache-Control', 'private, max-age=60')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:     'Detail prediksi',

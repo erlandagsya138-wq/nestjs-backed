@@ -17,7 +17,7 @@ import { ExportVerifiedDatasetUseCase } from '../use-cases/export-verified-datas
 
 export type MobilePredictionItemDto = Pick<
   PredictionResponseDto,
-  'id' | 'varietyName' | 'confidenceScore' | 'imageUrl' | 'status' | 'createdAt'
+  'id' | 'varietyCode' | 'varietyName' | 'confidenceScore' | 'imageUrl' | 'status' | 'createdAt' | 'marketPriceSummary'
 >;
 
 export interface PaginatedMobilePredictionResponseDto extends Omit<PaginatedPredictionResponseDto, 'data'> {
@@ -59,11 +59,13 @@ export class PredictionOrchestrator {
     const dietItems: MobilePredictionItemDto[] = paginatedResult.data.map((item: PredictionResponseDto) => {
       return {
         id: item.id,
+        varietyCode: item.varietyCode,
         varietyName: item.varietyName,
         confidenceScore: item.confidenceScore,
         imageUrl: item.imageUrl,
         status: item.status,
         createdAt: item.createdAt,
+        marketPriceSummary: item.marketPriceSummary,
       };
     });
 
