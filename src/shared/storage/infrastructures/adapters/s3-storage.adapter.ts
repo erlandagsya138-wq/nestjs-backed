@@ -43,10 +43,10 @@ export class S3StorageAdapter implements IStorageAdapter {
         accessKeyId:     this.config.getOrThrow<string>('AWS_ACCESS_KEY_ID'),
         secretAccessKey: this.config.getOrThrow<string>('AWS_SECRET_ACCESS_KEY'),
       },
+      endpoint: this.config.get<string>('AWS_S3_ENDPOINT'),
+      forcePathStyle: true,
     };
 
-    // Reason: ESLint strict mode fails to resolve AWS SDK v3 class constructor types.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
     this.client = new S3Client(s3Config);
   }
 
