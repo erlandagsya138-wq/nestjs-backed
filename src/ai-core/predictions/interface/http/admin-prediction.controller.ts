@@ -9,12 +9,14 @@ import { RolesGuard } from '../../../../identity/auth/interface/guards/roles.gua
 import { UserRole } from '../../../../identity/users/domains/entities/user.entity';
 import { Roles } from '../../../../identity/auth/interface/decorators/roles.decorator';
 import type { Response } from 'express';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @ApiTags('Admin — Predictions')
 @ApiBearerAuth('JWT')
 @UseFilters(PredictionExceptionFilter)
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
+@SkipThrottle()
 @Controller('admin/predictions')
 export class AdminPredictionController {
   constructor(private readonly orchestrator: PredictionOrchestrator) {}

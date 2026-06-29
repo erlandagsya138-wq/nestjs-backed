@@ -1,6 +1,6 @@
 // src/ai-integration/infrastructures/health/ai-health.controller.ts
 import { Controller, Get, Logger, MessageEvent, Sse } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle,SkipThrottle } from '@nestjs/throttler';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -12,6 +12,7 @@ import { Public } from '../../../../identity/auth/interface/decorators/public.de
 
 @ApiTags('AI Health')
 @Controller('ai')
+@SkipThrottle()
 export class AiHealthController {
   private readonly logger = new Logger(AiHealthController.name);
 
