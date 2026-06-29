@@ -10,9 +10,9 @@ import { Observable, map } from 'rxjs';
 import { AiHealthService, type AiStatusSnapshot } from './ai-health.service';
 import { Public } from '../../../../identity/auth/interface/decorators/public.decorator';
 
+@SkipThrottle()
 @ApiTags('AI Health')
 @Controller('ai')
-@SkipThrottle()
 export class AiHealthController {
   private readonly logger = new Logger(AiHealthController.name);
 
