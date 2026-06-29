@@ -14,7 +14,6 @@ import {
   CreatePredictionData,
 } from './prediction.repository.interface';
 import { VerifyPredictionData } from './prediction.repository.interface';
-import { resolveVarietyName } from '../../../ai-integration/domains/constants/variety.constants'
 
 @Injectable()
 export class PredictionRepository implements IPredictionRepository {
@@ -157,15 +156,14 @@ export class PredictionRepository implements IPredictionRepository {
 
     // 3. Filter Tab Kurasi (Sudah disentuh admin vs Belum)
     if (filter.isCurated !== undefined && filter.isCurated !== null) {
-      // Memastikan nilai string "true" atau boolean true terbaca sama
       const isCurated = String(filter.isCurated) === 'true';
 
       if (isCurated) {
-        // Halaman Dataset: Ambil data yang sudah divalidasi (NOT NULL)
-        qb.andWhere('prediction.isVerified IS NOT NULL');
+        // Halaman Dataset: Hanya data yang sudah divalidasi admin
+        qb.andWhere('p.isVerified IS NOT NULL');
       } else {
-        // Halaman Kurasi: Ambil data yang masih antrean (NULL)
-        qb.andWhere('prediction.isVerified IS NULL');
+        // Halaman Kurasi: Hanya data antrean yang belum disentuh admin
+        qb.andWhere('p.isVerified IS NULL');
       }
     }
 
@@ -189,9 +187,11 @@ export class PredictionRepository implements IPredictionRepository {
       verifiedAt: new Date(),
     };
 
+    // Jika admin mengoreksi: simpan HANYA di actualVarietyCode (ground truth).
+    // varietyCode & varietyName asli dari AI TIDAK diubah agar description,
+    // origin, localName tetap konsisten dengan prediksi awal sistem.
     if (!data.isVerified && data.correctedVarietyCode) {
-      updatePayload.varietyCode = data.correctedVarietyCode;
-      updatePayload.varietyName = resolveVarietyName(data.correctedVarietyCode);
+      updatePayload.actualVarietyCode = data.correctedVarietyCode;
     }
 
     await this.ormRepo.update(id, updatePayload);
