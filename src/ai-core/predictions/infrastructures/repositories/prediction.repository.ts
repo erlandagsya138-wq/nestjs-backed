@@ -159,13 +159,11 @@ async findAllForAdmin(
   }
 
   if (filter.isCurated !== undefined && filter.isCurated !== null) {
-    const isCuratedBool =
-      filter.isCurated === true ||
-      String(filter.isCurated).toLowerCase() === 'true';
+    const val = String(filter.isCurated).toUpperCase();
 
-    if (isCuratedBool) {
+    if (val === 'TRUE' || val === 'VERIFIED') {
       qb.andWhere('p.curationStatus = :status', { status: CurationStatus.VERIFIED });
-    } else {
+    } else if (val === 'FALSE' || val === 'UNVERIFIED') {
       qb.andWhere('p.curationStatus = :status', { status: CurationStatus.UNVERIFIED });
     }
   }
@@ -181,6 +179,7 @@ async findAllForAdmin(
   async verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity> {
     const updatePayload: Partial<PredictionEntity> = {
       isVerified: data.isVerified,
+      curationStatus: CurationStatus.VERIFIED,
       adminNote: data.adminNote ?? null,
       verifiedAt: new Date(),
     };
