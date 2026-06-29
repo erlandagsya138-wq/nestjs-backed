@@ -1,5 +1,5 @@
-import { DurianCode } from '../../../../../fix/src/prediction/domain/value-objects/durian-code.vo';
-import { DatasetImage } from '../../../../../fix/src/prediction/domain/entities/dataset-image.entity';
+import { DurianCode } from '../value-objects/durian-code.vo';
+import { DatasetImage } from '../entities/dataset-image.entity';
 
 /**
  * Domain Entity: DatasetGroup

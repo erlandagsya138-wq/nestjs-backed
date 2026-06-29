@@ -1,4 +1,4 @@
-import { DurianCode } from '../../../../../fix/src/prediction/domain/value-objects/durian-code.vo';
+import { DurianCode } from '../value-objects/durian-code.vo';
 
 /**
  * Domain Entity: DatasetImage
