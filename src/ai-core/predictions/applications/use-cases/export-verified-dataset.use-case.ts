@@ -30,7 +30,7 @@ export class ExportVerifiedDatasetUseCase {
       res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Disposition', `attachment; filename=dataset_export_${dateStr}.zip`);
 
-      const archive = archiver.default('zip', { zlib: { level: 0 } });
+      const archive = archiver('zip', { zlib: { level: 0 } });
 
       archive.on('error', (err: Error) => {
         this.logger.error(`Archiver error: ${err.message}`, err.stack);
