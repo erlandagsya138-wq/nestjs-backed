@@ -32,8 +32,8 @@ export class AdminListPredictionsQueryDto {
 
   @ApiPropertyOptional({ description: 'Filter status verifikasi: true/false' })
   @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
     return undefined;
   })
   @IsBoolean()
@@ -42,8 +42,8 @@ export class AdminListPredictionsQueryDto {
 
   @ApiPropertyOptional({ description: 'Filter data yang sudah dikurasi (true) atau belum (false)' })
   @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
     return undefined;
   })
   @IsBoolean()
