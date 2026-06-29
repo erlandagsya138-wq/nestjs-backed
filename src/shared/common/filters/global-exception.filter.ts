@@ -1,4 +1,4 @@
-// src/common/filters/global-exception.filter.ts
+// src/shared/common/filters/global-exception.filter.ts
 import {
   ArgumentsHost,
   Catch,
@@ -26,6 +26,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const res  = ctx.getResponse<Response>();
     const req  = ctx.getRequest<Request>();
     const path = req?.url ?? 'unknown';
+
+    if (res.headersSent) {
+      const msg = exception instanceof Error ? exception.message : String(exception);
+      this.logger.error(
+        `[GlobalFilter] Exception setelah headers terkirim (stream aktif) — ${req?.method ?? ''} ${path}: ${msg}`,
+      );
+      res.end();
+      return;
+    }
 
     let status  = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Terjadi kesalahan internal. Silakan coba lagi.';

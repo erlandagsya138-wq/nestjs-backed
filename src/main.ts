@@ -101,7 +101,7 @@ async function bootstrap(): Promise<void> {
     origin:         corsOrigins,
     methods:        ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Signature', 'X-Agent-Version', 'X-API-Key'],
-    exposedHeaders: ['X-Request-Id'],
+    exposedHeaders: ['X-Request-Id', 'Content-Disposition', 'Content-Type'],
     credentials:    nodeEnv === 'production',
     maxAge:         86_400,
   });
@@ -157,6 +157,7 @@ async function bootstrap(): Promise<void> {
   await app.listen(port, host);
 
   logger.log('─'.repeat(60));
+  logger.log(`Starting Container`);
   logger.log(`🚀 Started in [${nodeEnv}] mode`);
   logger.log(`🌐 http://${host}:${port}/api/v1`);
   logger.log(`🤖 AI: ${config.get<string>('FASTAPI_BASE_URL', 'NOT SET')}`);

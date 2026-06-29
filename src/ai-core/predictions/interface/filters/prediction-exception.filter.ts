@@ -1,4 +1,4 @@
-// src/predictions/interface/filters/prediction-exception.filter.ts
+// src/ai-core/predictions/interface/filters/prediction-exception.filter.ts
 import {
   ArgumentsHost,
   Catch,
@@ -25,6 +25,14 @@ export class PredictionExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
+
+    if (res.headersSent) {
+      this.logger.error(
+        `[PredictionFilter] Exception setelah headers terkirim — ${req?.method ?? ''} ${req?.url ?? ''}: ${exception.message}`,
+      );
+      res.end();
+      return;
+    }
 
     const status = exception.getStatus
       ? exception.getStatus()
