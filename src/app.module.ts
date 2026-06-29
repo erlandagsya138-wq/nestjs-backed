@@ -101,13 +101,8 @@ import { AgentRunEntity }    from './ai-core/market-intelligence/domains/entitie
           timezone: '+07:00',
           charset: 'utf8mb4',
 
-          ssl: {
-            rejectUnauthorized: true,
-          },
-
           extra: {
             connectionLimit: config.get<number>('DB_CONNECTION_LIMIT', 10),
-            acquireTimeout: 10_000,
             enableKeepAlive: true,
             keepAliveInitialDelay: 30_000,
           },
