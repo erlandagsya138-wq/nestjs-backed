@@ -1,10 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import * as archiver from 'archiver';
 import { PassThrough } from 'stream';
 
 import { DatasetGroup } from '../../domains/entities/dataset-group.entity';
 import { DatasetImage } from '../../domains/entities/dataset-image.entity';
-import { DurianCode } from '../../domains/value-objects/durian-code.vo';
 import {
   DATASET_EXPORT_REPOSITORY,
   DatasetExportFilter,
@@ -15,6 +13,8 @@ import {
   type IFileStoragePort,
 } from '../../domains/ports/file-storage.port';
 import { ExportDatasetRequestDto } from '../dto/export-dataset-request.dto';
+
+import archiver = require('archiver');
 
 export interface ZipExportResult {
   stream: PassThrough;
@@ -42,7 +42,9 @@ export class ExportDatasetUseCase {
   async execute(request: ExportDatasetRequestDto): Promise<ZipExportResult> {
     const filter = this.buildFilter(request);
 
-    this.logger.log(`Starting dataset export with filter: ${JSON.stringify(filter)}`);
+    this.logger.log(
+      `Starting dataset export with filter: ${JSON.stringify(filter)}`,
+    );
 
     // 1. Ambil semua gambar dari repository
     const images = await this.datasetRepo.findImagesForExport(filter);
@@ -59,22 +61,32 @@ export class ExportDatasetUseCase {
     const filename = `durian_dataset_${timestamp}.zip`;
 
     // 4. Buat stream ZIP menggunakan archiver
+    //    archiver() callable langsung setelah fix import di atas
     const passThrough = new PassThrough();
-    const archive = archiver.default('zip', {
+    const archive = archiver('zip', {
       zlib: { level: 6 }, // kompresi sedang, balance antara speed & size
     });
 
-    archive.on('error', (err) => {
+    archive.on('error', (err: Error) => {
       this.logger.error(`Archiver error: ${err.message}`, err.stack);
       passThrough.destroy(err);
     });
 
+    archive.on('warning', (err: Error & { code?: string }) => {
+      if (err.code === 'ENOENT') {
+        this.logger.warn(`Archiver warning: ${err.message}`);
+      } else {
+        passThrough.destroy(err);
+      }
+    });
+
     archive.pipe(passThrough);
 
-    // 5. Tambah file ke ZIP secara async
-    // Kita jalankan pengisian ZIP di background, response stream langsung dikirim
-    this.populateArchive(archive, groups, filename).catch((err) => {
-      this.logger.error(`Failed to populate archive: ${err.message}`, err.stack);
+    // 5. Tambah file ke ZIP secara async di background
+    this.populateArchive(archive, groups).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(`Failed to populate archive: ${msg}`, stack);
       archive.abort();
     });
 
@@ -86,7 +98,7 @@ export class ExportDatasetUseCase {
     };
   }
 
-  // ─── Private helpers ────────────────────────────────────────────────────────
+  // ─── Private helpers ──────────────────────────────────────────────────────
 
   private buildFilter(dto: ExportDatasetRequestDto): DatasetExportFilter {
     return {
@@ -114,7 +126,6 @@ export class ExportDatasetUseCase {
   private async populateArchive(
     archive: archiver.Archiver,
     groups: DatasetGroup[],
-    filename: string,
   ): Promise<void> {
     let totalAdded = 0;
     let totalSkipped = 0;
@@ -123,7 +134,9 @@ export class ExportDatasetUseCase {
     for (const group of groups) {
       for (const image of group.getImages()) {
         try {
-          const buffer = await this.fileStorage.readFileAsBuffer(image.storagePath);
+          const buffer = await this.fileStorage.readFileAsBuffer(
+            image.storagePath,
+          );
 
           archive.append(buffer, {
             name: `${group.getFolderName()}/${image.getZipFilename()}`,
@@ -139,17 +152,11 @@ export class ExportDatasetUseCase {
           });
 
           totalAdded++;
-        } catch (err) {
-          if (err instanceof Error) {
-            this.logger.warn(
-              `Skipping image ${image.id} (${image.storagePath}): ${err.message}`,
-            );
-          } else {
-            this.logger.warn(
-              `Skipping image ${image.id} (${image.storagePath}): ${String(err)}`,
-            );
-          }
-
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Skipping image ${image.id} (${image.storagePath}): ${msg}`,
+          );
           totalSkipped++;
         }
       }
