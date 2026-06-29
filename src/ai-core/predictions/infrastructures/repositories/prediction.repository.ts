@@ -15,6 +15,7 @@ import {
 } from './prediction.repository.interface';
 import { VerifyPredictionData } from './prediction.repository.interface';
 import { resolveVarietyName } from '../../../ai-integration/domains/constants/variety.constants';
+import { AdminPredictionFilter } from './prediction.repository.interface';
 
 @Injectable()
 export class PredictionRepository implements IPredictionRepository {
@@ -143,31 +144,40 @@ export class PredictionRepository implements IPredictionRepository {
   }
 
   async findAllForAdmin(
-  filter: import('./prediction.repository.interface').AdminPredictionFilter,
+  filter: AdminPredictionFilter,
 ): Promise<[PredictionEntity[], number]> {
   const qb = this.ormRepo.createQueryBuilder('p');
 
   if (filter.status) {
-    qb.andWhere('p.status = :status', { status: filter.status });
+    qb.andWhere('p.status = :status', {
+      status: filter.status,
+    });
   }
 
   if (filter.varietyCode) {
-    qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
+    qb.andWhere('p.varietyCode = :varietyCode', {
+      varietyCode: filter.varietyCode,
+    });
   }
 
-  if (filter.isCurated !== undefined && filter.isCurated !== null) {
-    const isCurated = Boolean(filter.isCurated);
-
-    if (isCurated) {
-      qb.andWhere('(p.isVerified = 0 OR p.isVerified = 1)');
-    } else {
-      qb.andWhere('p.isVerified IS NULL');
-    }
+  // Dataset
+  if (filter.isCurated === true) {
+    qb.andWhere('p.isVerified IS NOT NULL');
   }
 
-  qb.orderBy('p.createdAt', 'DESC')
+  // Kurasi AI
+  if (filter.isCurated === false) {
+    qb.andWhere('p.isVerified IS NULL');
+  }
+
+  qb
+    .orderBy('p.createdAt', 'DESC')
     .skip(filter.skip)
     .take(filter.limit);
+
+  console.log('FILTER:', filter);
+  console.log('SQL:', qb.getSql());
+  console.log('PARAMS:', qb.getParameters());
 
   return qb.getManyAndCount();
 }
