@@ -158,18 +158,16 @@ async findAllForAdmin(
 
   // Menangani filter isCurated dengan aman
   if (filter.isCurated !== undefined && filter.isCurated !== null) {
-    // Memastikan kita membandingkan boolean dengan benar
     const isCurated = filter.isCurated === true || String(filter.isCurated) === 'true';
 
     if (isCurated) {
-      // DATASET: Munculkan data yang SUDAH dikurasi (0 atau 1)
-      // Menggunakan IS NOT NULL menangkap 0 dan 1
-      qb.andWhere('p.isVerified IS NOT NULL');
+      // DATASET: Munculkan data yang SUDAH diverifikasi. 
+      // Kita cek IS NOT NULL dan memastikan nilainya bukan hanya 0 (jika 0 dianggap belum kurasi)
+      qb.andWhere('p.isVerified IS NOT NULL'); 
     } else {
-      // KURASI AI: Munculkan data yang BELUM dikurasi
-      // Jika di DB data yang belum dikurasi adalah NULL, IS NULL akan bekerja.
-      // Jika Anda ragu, tambahkan OR p.isVerified = 0 (bergantung cara Anda menyimpan data awal)
-      qb.andWhere('p.isVerified IS NULL');
+      // KURASI AI: Munculkan data yang BENAR-BENAR belum disentuh admin.
+      // Kita pakai pendekatan OR untuk menangkap NULL atau 0 (false)
+      qb.andWhere('(p.isVerified IS NULL OR p.isVerified = false)');
     }
   }
 
