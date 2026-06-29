@@ -101,6 +101,35 @@ export class PredictionResponseDto {
   })
   aiRequestId: string | null = null;
 
+  // ── Admin Verification Fields (Human-in-the-loop) ────────────
+  @ApiPropertyOptional({
+    example:     true,
+    description: 'Status verifikasi admin: true = benar, false = salah, null = belum dikurasi',
+    nullable:    true,
+  })
+  isVerified: boolean | null = null;
+
+  @ApiPropertyOptional({
+    example:     'Bentuk duri sesuai dengan ciri D197',
+    description: 'Catatan tambahan dari admin saat proses kurasi',
+    nullable:    true,
+  })
+  adminNote: string | null = null;
+
+  @ApiPropertyOptional({
+    example:     'D197',
+    description: 'Kode varietas sebenarnya jika prediksi AI salah (koreksi admin)',
+    nullable:    true,
+  })
+  actualVarietyCode: string | null = null;
+
+  @ApiPropertyOptional({
+    example:     '2024-01-16T10:30:00.000Z',
+    description: 'Waktu verifikasi oleh admin',
+    nullable:    true,
+  })
+  verifiedAt: Date | null = null;
+
   @ApiPropertyOptional({
     type: MarketPriceSummaryDto,
     description: 'Ringkasan harga pasar untuk varietas ini (jika tersedia)',
