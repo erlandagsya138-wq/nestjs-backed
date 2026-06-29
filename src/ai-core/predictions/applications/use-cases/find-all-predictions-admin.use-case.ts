@@ -13,11 +13,11 @@ export class FindAllPredictionsAdminUseCase {
   ) {}
 
   async execute(query: AdminListPredictionsQueryDto): Promise<PaginatedPredictionResponseDto> {
-    const { page, limit, status, varietyCode, isVerified } = query;
+    const { page, limit, status, varietyCode, isVerified, isCurated } = query;
     const skip = (page - 1) * limit;
 
     const [predictions, total] = await this.predictionRepo.findAllForAdmin({
-      skip, limit, status, varietyCode, isVerified,
+      skip, limit, status, varietyCode, isVerified, isCurated
     });
 
     return {
