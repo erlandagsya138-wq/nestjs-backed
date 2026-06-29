@@ -187,9 +187,6 @@ export class PredictionRepository implements IPredictionRepository {
       verifiedAt: new Date(),
     };
 
-    // Jika admin mengoreksi: simpan HANYA di actualVarietyCode (ground truth).
-    // varietyCode & varietyName asli dari AI TIDAK diubah agar description,
-    // origin, localName tetap konsisten dengan prediksi awal sistem.
     if (!data.isVerified && data.correctedVarietyCode) {
       updatePayload.actualVarietyCode = data.correctedVarietyCode;
     }
