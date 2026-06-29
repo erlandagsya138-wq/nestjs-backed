@@ -1,5 +1,5 @@
 // src/ai-core/predictions/infrastructures/repositories/prediction.repository.ts
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,6 +13,8 @@ import {
   PredictionResultPayload,
   CreatePredictionData,
 } from './prediction.repository.interface';
+import { VerifyPredictionData } from './prediction.repository.interface';
+import { resolveVarietyName } from '../../../ai-integration/domains/constants/variety.constants'
 
 @Injectable()
 export class PredictionRepository implements IPredictionRepository {
@@ -143,20 +145,31 @@ export class PredictionRepository implements IPredictionRepository {
   async findAllForAdmin(filter: import('./prediction.repository.interface').AdminPredictionFilter): Promise<[PredictionEntity[], number]> {
     const qb = this.ormRepo.createQueryBuilder('p');
 
+    // 1. Filter Status Umum (SUCCESS, FAILED, PENDING)
     if (filter.status) {
       qb.andWhere('p.status = :status', { status: filter.status });
     }
+
+    // 2. Filter Kode Varietas
     if (filter.varietyCode) {
       qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
     }
-    if (filter.isVerified !== undefined) {
-      if (filter.isVerified === null) {
-        qb.andWhere('p.isVerified IS NULL');
+
+    // 3. Filter Tab Kurasi (Sudah disentuh admin vs Belum)
+    if (filter.isCurated !== undefined) {
+      if (filter.isCurated === true) {
+        qb.andWhere('p.isVerified IS NOT NULL');
       } else {
-        qb.andWhere('p.isVerified = :isVerified', { isVerified: filter.isVerified });
+        qb.andWhere('p.isVerified IS NULL');
       }
     }
 
+    // 4. Filter Akurasi Spesifik (Hanya mencari yang "Benar" atau "Salah")
+    if (filter.isVerified !== undefined && filter.isVerified !== null) {
+      qb.andWhere('p.isVerified = :isVerified', { isVerified: filter.isVerified });
+    }
+
+    // 5. Sorting & Pagination
     qb.orderBy('p.createdAt', 'DESC')
       .skip(filter.skip)
       .take(filter.limit);
@@ -164,16 +177,30 @@ export class PredictionRepository implements IPredictionRepository {
     return qb.getManyAndCount();
   }
 
-  async verify(id: string, data: import('./prediction.repository.interface').VerifyPredictionData): Promise<PredictionEntity> {
-    await this.ormRepo.update(id, {
+  async verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity> {
+    const updatePayload: Partial<PredictionEntity> = {
       isVerified: data.isVerified,
       adminNote: data.adminNote ?? null,
       verifiedAt: new Date(),
-    });
+    };
+
+    if (!data.isVerified && data.correctedVarietyCode) {
+      updatePayload.varietyCode = data.correctedVarietyCode;
+      updatePayload.varietyName = resolveVarietyName(data.correctedVarietyCode);
+    }
+
+    await this.ormRepo.update(id, updatePayload);
 
     const updated = await this.findById(id);
     if (!updated) throw new InternalServerErrorException(`Prediction id='${id}' tidak ditemukan setelah verifikasi.`);
     return updated;
+  }
+
+  async delete(id: string): Promise<void> {
+    const result = await this.ormRepo.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Gagal menghapus: Prediction dengan id='${id}' tidak ditemukan.`);
+    }
   }
 
   async findEligibleForBulkAdd(filter: BulkAddFilter): Promise<PredictionEntity[]> {

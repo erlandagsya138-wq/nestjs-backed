@@ -14,6 +14,7 @@ import type { IUploadedFile } from '../../../../shared/storage/domains/mappers/s
 import { VerifyPredictionUseCase } from '../use-cases/verify-prediction.use-case';
 import { FindAllPredictionsAdminUseCase } from '../use-cases/find-all-predictions-admin.use-case';
 import { ExportVerifiedDatasetUseCase } from '../use-cases/export-verified-dataset.use-case';
+import { DeletePredictionUseCase } from '../use-cases/delete-prediction.use-case';
 
 export type MobilePredictionItemDto = Pick<
   PredictionResponseDto,
@@ -33,6 +34,7 @@ export class PredictionOrchestrator {
     private readonly findAllAdmin:     FindAllPredictionsAdminUseCase,
     private readonly verifyPrediction: VerifyPredictionUseCase,
     private readonly exportDatasetUseCase: ExportVerifiedDatasetUseCase,
+    private readonly deletePredictionUseCase: DeletePredictionUseCase,
   ) {}
 
   create(
@@ -85,5 +87,9 @@ export class PredictionOrchestrator {
 
   exportVerifiedDataset(res: Response): Promise<void> {
     return this.exportDatasetUseCase.execute(res);
+  }
+
+  deletePrediction(id: string): Promise<void> {
+    return this.deletePredictionUseCase.execute(id);
   }
 }

@@ -48,6 +48,10 @@ export interface VerifyPredictionData {
   correctedVarietyCode?: string;
 }
 
+export interface AdminPredictionFilter {
+  isCurated?: boolean;
+}
+
 export interface IPredictionRepository {
   findById(id: string): Promise<PredictionEntity | null>;
   findAllByUserId(userId: string): Promise<PredictionEntity[]>;
@@ -64,6 +68,7 @@ export interface IPredictionRepository {
   findAllForAdmin(filter: AdminPredictionFilter): Promise<[PredictionEntity[], number]>;
   findVerifiedForExport(): Promise<PredictionEntity[]>;
   verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity>;
+  delete(id: string): Promise<void>;
 }
 
 export const PREDICTION_REPOSITORY_TOKEN = Symbol('IPredictionRepository');

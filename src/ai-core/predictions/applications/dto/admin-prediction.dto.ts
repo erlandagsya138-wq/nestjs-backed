@@ -39,6 +39,16 @@ export class AdminListPredictionsQueryDto {
   @IsBoolean()
   @IsOptional()
   readonly isVerified?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter data yang sudah dikurasi (true) atau belum (false)' })
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  })
+  @IsBoolean()
+  @IsOptional()
+  readonly isCurated?: boolean;
 }
 
 export class VerifyPredictionDto {

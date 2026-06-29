@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Query, UseFilters, UseGuards, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Query, UseFilters, UseGuards, Res, Delete } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PredictionOrchestrator } from '../../applications/orchestrator/prediction.orchestrator';
 import { AdminListPredictionsQueryDto, VerifyPredictionDto } from '../../applications/dto/admin-prediction.dto';
@@ -44,5 +44,15 @@ export class AdminPredictionController {
     @Body() dto: VerifyPredictionDto,
   ): Promise<PredictionResponseDto> {
     return this.orchestrator.verify(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Hapus prediksi (membuang gambar bukan durian)' })
+  async remove(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<{ message: string }> {
+    await this.orchestrator.deletePrediction(id);
+    return { message: 'Data prediksi berhasil dihapus' };
   }
 }
