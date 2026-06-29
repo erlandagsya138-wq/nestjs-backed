@@ -150,7 +150,6 @@ async findAllForAdmin(
 ): Promise<[PredictionEntity[], number]> {
   const qb = this.ormRepo.createQueryBuilder('p');
 
-  // Filter dasar (Status & Variety) tetap sama
   if (filter.status) {
     qb.andWhere('p.status = :status', { status: filter.status });
   }
@@ -159,22 +158,22 @@ async findAllForAdmin(
     qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
   }
 
-  // --- PERUBAHAN UTAMA: Gunakan CurationStatus ---
   if (filter.isCurated !== undefined && filter.isCurated !== null) {
-    // Kita anggap filter.isCurated = true adalah untuk Dataset (VERIFIED)
-    // dan false untuk Kurasi AI (UNVERIFIED)
-    const isCurated = String(filter.isCurated) === 'true';
+    const isCuratedBool =
+      filter.isCurated === true ||
+      String(filter.isCurated).toLowerCase() === 'true';
 
-    if (isCurated) {
+    if (isCuratedBool) {
       qb.andWhere('p.curationStatus = :status', { status: CurationStatus.VERIFIED });
     } else {
       qb.andWhere('p.curationStatus = :status', { status: CurationStatus.UNVERIFIED });
     }
   }
 
+  // 4. Sorting & Pagination
   qb.orderBy('p.createdAt', 'DESC')
-    .skip(filter.skip)
-    .take(filter.limit);
+    .skip(filter.skip || 0)
+    .take(filter.limit || 20);
 
   return qb.getManyAndCount();
 }
