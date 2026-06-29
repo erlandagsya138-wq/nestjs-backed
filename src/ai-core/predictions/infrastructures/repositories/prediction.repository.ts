@@ -150,22 +150,24 @@ async findAllForAdmin(
 ): Promise<[PredictionEntity[], number]> {
   const qb = this.ormRepo.createQueryBuilder('p');
 
+  // 1. Filter Status (Jika ada)
   if (filter.status) {
     qb.andWhere('p.status = :status', { status: filter.status });
   }
 
+  // 2. Filter Variety (Jika ada)
   if (filter.varietyCode) {
     qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
   }
 
+  // 3. Filter Curation (Satu-satunya yang menentukan tampilan di UI)
   if (filter.isCurated !== undefined && filter.isCurated !== null) {
-    const val = String(filter.isCurated).toUpperCase();
-
-    if (val === 'TRUE' || val === 'VERIFIED') {
-      qb.andWhere('p.curationStatus = :status', { status: CurationStatus.VERIFIED });
-    } else if (val === 'FALSE' || val === 'UNVERIFIED') {
-      qb.andWhere('p.curationStatus = :status', { status: CurationStatus.UNVERIFIED });
-    }
+    const isCurated = String(filter.isCurated).toLowerCase() === 'true';
+    
+    // Gunakan string literal langsung agar tidak ada salah enum mapping
+    const status = isCurated ? 'VERIFIED' : 'UNVERIFIED';
+    
+    qb.andWhere('p.curationStatus = :status', { status: status });
   }
 
   // 4. Sorting & Pagination
