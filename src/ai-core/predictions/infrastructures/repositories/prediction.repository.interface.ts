@@ -27,6 +27,7 @@ export interface AdminPredictionFilter {
   status?: string;
   varietyCode?: string;
   isVerified?: boolean;
+  isCurated?: boolean;
 }
 
 export interface CreatePredictionData {
@@ -41,15 +42,10 @@ export interface BulkAddFilter {
   onlyVerified: boolean;
 }
 
-// 👇 Menggabungkan parameter verifikasi ke dalam satu interface
 export interface VerifyPredictionData {
   isVerified: boolean;
   adminNote?: string;
   correctedVarietyCode?: string;
-}
-
-export interface AdminPredictionFilter {
-  isCurated?: boolean;
 }
 
 export interface IPredictionRepository {

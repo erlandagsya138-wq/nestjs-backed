@@ -155,20 +155,21 @@ export class PredictionRepository implements IPredictionRepository {
     }
 
     // 3. Filter Tab Kurasi (Sudah disentuh admin vs Belum)
-    if (filter.isCurated !== undefined && filter.isCurated !== null) {
-      const isCuratedStr = String(filter.isCurated);
-      if (isCuratedStr === 'true') {
-        // Halaman Dataset: Hanya data yang sudah divalidasi admin
-        qb.andWhere('p.isVerified IS NOT NULL');
-      } else if (isCuratedStr === 'false') {
-        // Halaman Kurasi: Hanya data antrean yang belum disentuh admin
-        qb.andWhere('p.isVerified IS NULL');
+    //    Jika isCurated dikirim, filter ini mengambil alih sepenuhnya.
+    //    isVerified TIDAK boleh aktif bersamaan karena keduanya
+    //    beroperasi pada kolom yang sama (isVerified).
+    if (filter.isCurated === true) {
+      // Halaman Dataset: Hanya data yang sudah divalidasi admin (isVerified = true ATAU false)
+      qb.andWhere('p.isVerified IS NOT NULL');
+    } else if (filter.isCurated === false) {
+      // Halaman Kurasi: Hanya data antrean yang belum disentuh admin sama sekali
+      qb.andWhere('p.isVerified IS NULL');
+    } else {
+      // 4. Filter Akurasi Spesifik — hanya aktif jika isCurated TIDAK dikirim
+      //    (Hanya mencari yang "Benar" atau "Salah" secara spesifik)
+      if (filter.isVerified !== undefined && filter.isVerified !== null) {
+        qb.andWhere('p.isVerified = :isVerified', { isVerified: filter.isVerified });
       }
-    }
-
-    // 4. Filter Akurasi Spesifik (Hanya mencari yang "Benar" atau "Salah")
-    if (filter.isVerified !== undefined && filter.isVerified !== null) {
-      qb.andWhere('p.isVerified = :isVerified', { isVerified: filter.isVerified });
     }
 
     // 5. Sorting & Pagination
