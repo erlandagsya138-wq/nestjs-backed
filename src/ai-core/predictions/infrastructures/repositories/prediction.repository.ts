@@ -156,11 +156,14 @@ export class PredictionRepository implements IPredictionRepository {
     }
 
     // 3. Filter Tab Kurasi (Sudah disentuh admin vs Belum)
-    if (filter.isCurated !== undefined) {
-      if (filter.isCurated === true) {
-        qb.andWhere('p.isVerified IS NOT NULL');
+    if (filter.isCurated !== undefined && filter.isCurated !== null) {
+      // Parsing aman: pastikan nilai "true" string juga terbaca sebagai boolean true
+      const isCurated = filter.isCurated === true || String(filter.isCurated) === 'true';
+
+      if (isCurated) {
+        qb.andWhere('p.isVerified IS NOT NULL'); // Untuk halaman Dataset
       } else {
-        qb.andWhere('p.isVerified IS NULL');
+        qb.andWhere('p.isVerified IS NULL');     // Untuk halaman Kurasi AI
       }
     }
 
