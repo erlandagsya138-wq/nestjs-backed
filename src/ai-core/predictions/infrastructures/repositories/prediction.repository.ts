@@ -143,44 +143,42 @@ export class PredictionRepository implements IPredictionRepository {
     });
   }
 
-  async findAllForAdmin(
+async findAllForAdmin(
   filter: AdminPredictionFilter,
 ): Promise<[PredictionEntity[], number]> {
   const qb = this.ormRepo.createQueryBuilder('p');
 
   if (filter.status) {
-    qb.andWhere('p.status = :status', {
-      status: filter.status,
-    });
+    qb.andWhere('p.status = :status', { status: filter.status });
   }
 
   if (filter.varietyCode) {
-    qb.andWhere('p.varietyCode = :varietyCode', {
-      varietyCode: filter.varietyCode,
-    });
+    qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
   }
 
-  // Dataset
-  if (filter.isCurated === true) {
-    qb.andWhere('p.isVerified IS NOT NULL');
+  // Menangani filter isCurated dengan aman
+  if (filter.isCurated !== undefined && filter.isCurated !== null) {
+    // Memastikan kita membandingkan boolean dengan benar
+    const isCurated = filter.isCurated === true || String(filter.isCurated) === 'true';
+
+    if (isCurated) {
+      // DATASET: Munculkan data yang SUDAH dikurasi (0 atau 1)
+      // Menggunakan IS NOT NULL menangkap 0 dan 1
+      qb.andWhere('p.isVerified IS NOT NULL');
+    } else {
+      // KURASI AI: Munculkan data yang BELUM dikurasi
+      // Jika di DB data yang belum dikurasi adalah NULL, IS NULL akan bekerja.
+      // Jika Anda ragu, tambahkan OR p.isVerified = 0 (bergantung cara Anda menyimpan data awal)
+      qb.andWhere('p.isVerified IS NULL');
+    }
   }
 
-  // Kurasi AI
-  if (filter.isCurated === false) {
-    qb.andWhere('p.isVerified IS NULL');
-  }
-
-  qb
-    .orderBy('p.createdAt', 'DESC')
+  qb.orderBy('p.createdAt', 'DESC')
     .skip(filter.skip)
     .take(filter.limit);
 
-  console.log('FILTER:', filter);
-  console.log('SQL:', qb.getSql());
-  console.log('PARAMS:', qb.getParameters());
-
-  console.log("===== REPOSITORY =====");
-console.log(filter);
+  // DEBUG: Jika masih tidak tampil, hapus komentar di bawah ini untuk melihat query asli di terminal
+  // console.log("Executing Query:", qb.getSql(), qb.getParameters());
 
   return qb.getManyAndCount();
 }

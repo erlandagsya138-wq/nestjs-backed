@@ -32,8 +32,6 @@ export class AdminPredictionController {
   @ApiOperation({ summary: 'List semua prediksi (untuk Kurasi Admin)' })
   @ApiOkResponse({ type: PaginatedPredictionResponseDto })
   getAll(@Query() query: AdminListPredictionsQueryDto): Promise<PaginatedPredictionResponseDto> {
-    console.log("===== CONTROLLER =====");
-    console.log(query);
     return this.orchestrator.getAllForAdmin(query);
   }
 

@@ -13,8 +13,6 @@ export class FindAllPredictionsAdminUseCase {
   ) {}
 
   async execute(query: AdminListPredictionsQueryDto): Promise<PaginatedPredictionResponseDto> {
-    console.log("===== USECASE =====");
-  console.log(query);
     const { page, limit, status, varietyCode, isVerified, isCurated } = query;
     const skip = (page - 1) * limit;
 
