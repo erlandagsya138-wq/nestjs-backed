@@ -153,13 +153,21 @@ export class PredictionRepository implements IPredictionRepository {
       qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
     }
 
-    if (filter.isCurated === true) {
-      qb.andWhere('p.isVerified IS NOT NULL');
-    } else if (filter.isCurated === false) {
-      qb.andWhere('p.isVerified IS NULL');
-    } else {
-      if (filter.isVerified !== undefined && filter.isVerified !== null) {
-        qb.andWhere('p.isVerified = :isVerified', { isVerified: filter.isVerified });
+    if (filter.isCurated !== undefined && filter.isCurated !== null) {
+      const isCuratedStr = String(filter.isCurated);
+
+      if (isCuratedStr === 'true') {
+        qb.andWhere('p.isVerified IS NOT NULL');
+      } else if (isCuratedStr === 'false') {
+        qb.andWhere('p.isVerified IS NULL');
+      }
+    }
+    else if (filter.isVerified !== undefined && filter.isVerified !== null) {
+      const isVerifiedStr = String(filter.isVerified);
+      if (isVerifiedStr === 'true') {
+        qb.andWhere('p.isVerified = :isVerified', { isVerified: true });
+      } else if (isVerifiedStr === 'false') {
+        qb.andWhere('p.isVerified = :isVerified', { isVerified: false });
       }
     }
 
