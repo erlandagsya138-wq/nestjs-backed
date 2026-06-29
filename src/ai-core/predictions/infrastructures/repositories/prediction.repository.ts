@@ -179,6 +179,9 @@ export class PredictionRepository implements IPredictionRepository {
   console.log('SQL:', qb.getSql());
   console.log('PARAMS:', qb.getParameters());
 
+  console.log("===== REPOSITORY =====");
+console.log(filter);
+
   return qb.getManyAndCount();
 }
 
