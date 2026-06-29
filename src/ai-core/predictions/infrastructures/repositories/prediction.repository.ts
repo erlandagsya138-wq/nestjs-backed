@@ -154,12 +154,12 @@ export class PredictionRepository implements IPredictionRepository {
     }
 
     if (filter.isCurated !== undefined && filter.isCurated !== null) {
-      const isCurated = String(filter.isCurated) === 'true';
+    const isCurated = String(filter.isCurated) === 'true';
 
       if (isCurated) {
-        qb.andWhere('p.isVerified = :val', { val: 1 });
+        qb.andWhere('(p.isVerified = 0 OR p.isVerified = 1)');
       } else {
-        qb.andWhere('(p.isVerified IS NULL OR p.isVerified = 0)');
+        qb.andWhere('p.isVerified IS NULL');
       }
     }
 
@@ -168,7 +168,7 @@ export class PredictionRepository implements IPredictionRepository {
       .take(filter.limit);
 
     return qb.getManyAndCount();
-  }
+    }
 
   async verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity> {
     const updatePayload: Partial<PredictionEntity> = {
