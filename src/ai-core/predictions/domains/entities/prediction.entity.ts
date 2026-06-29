@@ -31,6 +31,12 @@ const decimalTransformer: ValueTransformer = {
   },
 };
 
+// 1. Tambahkan transformer di atas class PredictionEntity
+  const booleanTransformer: ValueTransformer = {
+    to: (v: boolean | null) => (v === null ? null : v ? 1 : 0), // Simpan boolean jadi 1 atau 0
+    from: (v: any) => (v === null ? null : v === 1 || v === true), // Baca 1 atau true jadi boolean
+  };
+
 @Entity({ name: 'predictions' })
 export class PredictionEntity {
   // ── Primary Key ──────────────────────────────────────────────
@@ -120,7 +126,12 @@ export class PredictionEntity {
   errorMessage: string | null = null;
 
   // ── Admin Verification Fields (Human-in-the-loop) ────────────
-  @Column({ type: 'boolean', nullable: true, default: null })
+  @Column({
+    type: 'boolean',
+    nullable: true,
+    default: null,
+    transformer: booleanTransformer
+  })
   isVerified: boolean | null = null;
 
   @Column({ type: 'timestamp', nullable: true, default: null })
