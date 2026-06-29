@@ -1,3 +1,4 @@
+// src/ai-core/predictions/infrastructures/repositories/prediction.repository.ts
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -56,7 +57,7 @@ export class PredictionRepository implements IPredictionRepository {
 
     const id = uuidv4();
 
-    // Pastikan data baru selalu berstatus UNVERIFIED
+    // Data baru PASTI masuk sebagai UNVERIFIED (Akan muncul di Kurasi AI)
     await this.ormRepo.save({
       id,
       userId: data.userId.trim(),
@@ -111,7 +112,7 @@ export class PredictionRepository implements IPredictionRepository {
     });
   }
 
-  // --- FUNGSI INI YANG MEMASTIKAN HALAMAN KURASI & DATASET TERPISAH ---
+  // --- FILTER PEMISAH HALAMAN (KURASI VS DATASET) ---
   async findAllForAdmin(
     filter: AdminPredictionFilter,
   ): Promise<[PredictionEntity[], number]> {
@@ -125,33 +126,25 @@ export class PredictionRepository implements IPredictionRepository {
       qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
     }
 
-    // Filter CurationStatus yang tahan banting (Bisa menerima true/false maupun VERIFIED/UNVERIFIED dari URL)
-    if (filter.isCurated !== undefined && filter.isCurated !== null) {
-      const isCuratedStr = String(filter.isCurated).toUpperCase();
-      
-      if (isCuratedStr === 'TRUE' || isCuratedStr === 'VERIFIED') {
-        qb.andWhere('p.curationStatus = :curationStatus', { curationStatus: CurationStatus.VERIFIED });
-      } else if (isCuratedStr === 'FALSE' || isCuratedStr === 'UNVERIFIED') {
-        qb.andWhere('p.curationStatus = :curationStatus', { curationStatus: CurationStatus.UNVERIFIED });
-      }
+    // Hanya jika DTO mengizinkan isCurated (true / false)
+    if (filter.isCurated !== undefined) {
+      // Jika true -> VERIFIED. Jika false -> UNVERIFIED.
+      const targetStatus = filter.isCurated ? CurationStatus.VERIFIED : CurationStatus.UNVERIFIED;
+      qb.andWhere('p.curationStatus = :curationStatus', { curationStatus: targetStatus });
     }
 
-    // Tambahan safety untuk pagination
-    const skipValue = isNaN(Number(filter.skip)) ? 0 : Number(filter.skip);
-    const limitValue = isNaN(Number(filter.limit)) ? 20 : Number(filter.limit);
-
     qb.orderBy('p.createdAt', 'DESC')
-      .skip(skipValue)
-      .take(limitValue);
+      .skip(filter.skip || 0)
+      .take(filter.limit || 20);
 
     return qb.getManyAndCount();
   }
 
-  // --- FUNGSI INI YANG MEMINDAHKAN DATA DARI KURASI KE DATASET ---
+  // --- LOGIKA VERIFIKASI (MINDHAKAN DATA KE DATASET) ---
   async verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity> {
     const updatePayload: Partial<PredictionEntity> = {
       isVerified: data.isVerified,
-      curationStatus: CurationStatus.VERIFIED, // Data otomatis pindah halaman!
+      curationStatus: CurationStatus.VERIFIED, // Data OTOMATIS pindah ke Halaman Dataset
       adminNote: data.adminNote ?? null,
       verifiedAt: new Date(),
     };
@@ -176,7 +169,6 @@ export class PredictionRepository implements IPredictionRepository {
     }
   }
 
-  // --- FILTER EXPORT DATA HARUS MERUJUK KE CurationStatus ---
   async findEligibleForBulkAdd(filter: BulkAddFilter): Promise<PredictionEntity[]> {
     const qb = this.ormRepo.createQueryBuilder('p')
       .where('p.status = :status', { status: PredictionStatus.SUCCESS })

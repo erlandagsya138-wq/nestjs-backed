@@ -1,5 +1,6 @@
+// src/ai-core/predictions/applications/dto/admin-prediction.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { PredictionStatus } from '../../domains/entities/prediction.entity';
 
@@ -32,8 +33,9 @@ export class AdminListPredictionsQueryDto {
 
   @ApiPropertyOptional({ description: 'Filter status verifikasi: true/false' })
   @Transform(({ value }) => {
-    if (value === true  || value === 'true')  return true;
-    if (value === false || value === 'false') return false;
+    const val = String(value).toUpperCase();
+    if (val === 'TRUE' || val === '1') return true;
+    if (val === 'FALSE' || val === '0') return false;
     return undefined;
   })
   @IsBoolean()
@@ -42,8 +44,11 @@ export class AdminListPredictionsQueryDto {
 
   @ApiPropertyOptional({ description: 'Filter data yang sudah dikurasi (true) atau belum (false)' })
   @Transform(({ value }) => {
-    if (value === true  || value === 'true')  return true;
-    if (value === false || value === 'false') return false;
+    const val = String(value).toUpperCase();
+    // Jika URL mengandung isCurated=true, 1, atau VERIFIED -> diubah ke boolean true
+    if (val === 'TRUE' || val === '1' || val === 'VERIFIED') return true;
+    // Jika URL mengandung isCurated=false, 0, atau UNVERIFIED -> diubah ke boolean false
+    if (val === 'FALSE' || val === '0' || val === 'UNVERIFIED') return false;
     return undefined;
   })
   @IsBoolean()
