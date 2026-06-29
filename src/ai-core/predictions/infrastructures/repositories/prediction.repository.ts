@@ -142,33 +142,35 @@ export class PredictionRepository implements IPredictionRepository {
     });
   }
 
-  async findAllForAdmin(filter: import('./prediction.repository.interface').AdminPredictionFilter): Promise<[PredictionEntity[], number]> {
-    const qb = this.ormRepo.createQueryBuilder('p');
+  async findAllForAdmin(
+  filter: import('./prediction.repository.interface').AdminPredictionFilter,
+): Promise<[PredictionEntity[], number]> {
+  const qb = this.ormRepo.createQueryBuilder('p');
 
-    if (filter.status) {
-      qb.andWhere('p.status = :status', { status: filter.status });
+  if (filter.status) {
+    qb.andWhere('p.status = :status', { status: filter.status });
+  }
+
+  if (filter.varietyCode) {
+    qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
+  }
+
+  if (filter.isCurated !== undefined && filter.isCurated !== null) {
+    const isCurated = Boolean(filter.isCurated);
+
+    if (isCurated) {
+      qb.andWhere('(p.isVerified = 0 OR p.isVerified = 1)');
+    } else {
+      qb.andWhere('p.isVerified IS NULL');
     }
+  }
 
-    if (filter.varietyCode) {
-      qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
-    }
+  qb.orderBy('p.createdAt', 'DESC')
+    .skip(filter.skip)
+    .take(filter.limit);
 
-    if (filter.isCurated !== undefined && filter.isCurated !== null) {
-    const isCurated = String(filter.isCurated) === 'true';
-
-      if (isCurated) {
-        qb.andWhere('(p.isVerified = 0 OR p.isVerified = 1)');
-      } else {
-        qb.andWhere('p.isVerified IS NULL');
-      }
-    }
-
-    qb.orderBy('p.createdAt', 'DESC')
-      .skip(filter.skip)
-      .take(filter.limit);
-
-    return qb.getManyAndCount();
-    }
+  return qb.getManyAndCount();
+}
 
   async verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity> {
     const updatePayload: Partial<PredictionEntity> = {
