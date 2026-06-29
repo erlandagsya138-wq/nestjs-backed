@@ -25,6 +25,7 @@ export class VerifyPredictionUseCase {
     const updated = await this.predictionRepo.verify(id, {
       isVerified: dto.isVerified,
       adminNote: dto.adminNote,
+      correctedVarietyCode: dto.correctedVarietyCode,
     });
 
     return this.mapper.toResponseDto(updated);

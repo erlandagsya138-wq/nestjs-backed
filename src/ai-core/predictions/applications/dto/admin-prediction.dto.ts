@@ -57,4 +57,13 @@ export class VerifyPredictionDto {
   @IsOptional()
   @MaxLength(500)
   readonly adminNote?: string;
+
+  @ApiPropertyOptional({
+    description: 'Kode varietas yang benar jika prediksi disalahkan (misal: D197)',
+    example: 'D197',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  readonly correctedVarietyCode?: string;
 }

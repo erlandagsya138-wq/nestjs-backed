@@ -41,6 +41,13 @@ export interface BulkAddFilter {
   onlyVerified: boolean;
 }
 
+// 👇 Menggabungkan parameter verifikasi ke dalam satu interface
+export interface VerifyPredictionData {
+  isVerified: boolean;
+  adminNote?: string;
+  correctedVarietyCode?: string;
+}
+
 export interface IPredictionRepository {
   findById(id: string): Promise<PredictionEntity | null>;
   findAllByUserId(userId: string): Promise<PredictionEntity[]>;
@@ -57,11 +64,6 @@ export interface IPredictionRepository {
   findAllForAdmin(filter: AdminPredictionFilter): Promise<[PredictionEntity[], number]>;
   findVerifiedForExport(): Promise<PredictionEntity[]>;
   verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity>;
-}
-
-export interface VerifyPredictionData {
-  isVerified: boolean;
-  adminNote?: string;
 }
 
 export const PREDICTION_REPOSITORY_TOKEN = Symbol('IPredictionRepository');
