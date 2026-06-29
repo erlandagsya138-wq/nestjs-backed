@@ -154,29 +154,18 @@ export class PredictionRepository implements IPredictionRepository {
     }
 
     if (filter.isCurated !== undefined && filter.isCurated !== null) {
-      const isCuratedStr = String(filter.isCurated);
+      const isCurated = String(filter.isCurated) === 'true';
 
-      if (isCuratedStr === 'true') {
-        qb.andWhere('p.isVerified IS NOT NULL');
-      } else if (isCuratedStr === 'false') {
-        qb.andWhere('p.isVerified IS NULL');
-      }
-    }
-    else if (filter.isVerified !== undefined && filter.isVerified !== null) {
-      const isVerifiedStr = String(filter.isVerified);
-      if (isVerifiedStr === 'true') {
-        qb.andWhere('p.isVerified = :isVerified', { isVerified: true });
-      } else if (isVerifiedStr === 'false') {
-        qb.andWhere('p.isVerified = :isVerified', { isVerified: false });
+      if (isCurated) {
+        qb.andWhere('p.isVerified = :val', { val: 1 });
+      } else {
+        qb.andWhere('(p.isVerified IS NULL OR p.isVerified = 0)');
       }
     }
 
     qb.orderBy('p.createdAt', 'DESC')
       .skip(filter.skip)
       .take(filter.limit);
-
-      console.log('🔴 [DEBUG SQL] Filter yang diterima Repo:', filter);
-    console.log('🔴 [DEBUG SQL] Query Database:', qb.getSql());
 
     return qb.getManyAndCount();
   }
