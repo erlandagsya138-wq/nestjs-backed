@@ -10,6 +10,7 @@ import {
   PrimaryColumn,
   type Relation,
   ValueTransformer,
+  Index,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { UserEntity } from '../../../../identity/users/domains/entities/user.entity';
@@ -94,6 +95,7 @@ export class PredictionEntity {
   errorMessage: string | null = null;
 
   // ── Curation Status (Pembeda Mutlak) ─────────────────────────
+  @Index()
   @Column({ 
     type: 'enum', 
     enum: CurationStatus, 
