@@ -31,21 +31,11 @@ export class AdminListPredictionsQueryDto {
   readonly varietyCode?: string;
 
   @ApiPropertyOptional({ description: 'Filter status verifikasi: true/false' })
-  @Transform(({ value }) => {
-    if (value === 'true' || value === true) return true;
-    if (value === 'false' || value === false) return false;
-    return undefined;
-  })
   @IsBoolean()
   @IsOptional()
   readonly isVerified?: boolean;
 
   @ApiPropertyOptional({ description: 'Filter data yang sudah dikurasi (true) atau belum (false)' })
-  @Transform(({ value }) => {
-    if (value === 'true' || value === true) return true;
-    if (value === 'false' || value === false) return false;
-    return undefined;
-  })
   @IsBoolean()
   @IsOptional()
   readonly isCurated?: boolean;
