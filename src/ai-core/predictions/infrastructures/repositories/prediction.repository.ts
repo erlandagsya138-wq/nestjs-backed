@@ -1,22 +1,22 @@
-// src/ai-core/predictions/infrastructures/repositories/prediction.repository.ts
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not, IsNull } from 'typeorm';
+import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+
 import {
   PredictionEntity,
   PredictionStatus,
-  CurationStatus
+  CurationStatus,
 } from '../../domains/entities/prediction.entity';
-import { BulkAddFilter } from './prediction.repository.interface';
 import {
   IPredictionRepository,
   PredictionResultPayload,
   CreatePredictionData,
+  VerifyPredictionData,
+  AdminPredictionFilter,
+  BulkAddFilter,
 } from './prediction.repository.interface';
-import { VerifyPredictionData } from './prediction.repository.interface';
 import { resolveVarietyName } from '../../../ai-integration/domains/constants/variety.constants';
-import { AdminPredictionFilter } from './prediction.repository.interface';
 
 @Injectable()
 export class PredictionRepository implements IPredictionRepository {
@@ -38,8 +38,8 @@ export class PredictionRepository implements IPredictionRepository {
 
   async findAllByUserIdPaginated(
     userId: string,
-    skip:   number,
-    limit:  number,
+    skip: number,
+    limit: number,
   ): Promise<[PredictionEntity[], number]> {
     return this.ormRepo.findAndCount({
       where: { userId },
@@ -50,92 +50,58 @@ export class PredictionRepository implements IPredictionRepository {
   }
 
   async create(data: CreatePredictionData): Promise<PredictionEntity> {
-    if (!data.userId.trim()) {
-      throw new InternalServerErrorException(
-        'Tidak dapat membuat prediction: userId kosong.',
-      );
-    }
-    if (!data.storedFileId.trim()) {
-      throw new InternalServerErrorException(
-        'Tidak dapat membuat prediction: storedFileId kosong. ' +
-        'Pastikan file berhasil di-upload dan di-persist ke DB terlebih dahulu.',
-      );
-    }
-    if (!data.imageUrl.trim()) {
-      throw new InternalServerErrorException(
-        'Tidak dapat membuat prediction: imageUrl kosong.',
-      );
+    if (!data.userId?.trim() || !data.storedFileId?.trim() || !data.imageUrl?.trim()) {
+      throw new InternalServerErrorException('Data pembuatan prediction tidak lengkap.');
     }
 
     const id = uuidv4();
 
-    await this.ormRepo
-      .createQueryBuilder()
-      .insert()
-      .into(PredictionEntity)
-      .values({
-        id,
-        userId:       data.userId.trim(),
-        storedFileId: data.storedFileId.trim(),
-        imageUrl:     data.imageUrl.trim(),
-        status:       PredictionStatus.PENDING,
-        curationStatus: CurationStatus.UNVERIFIED,
-      })
-      .execute();
+    // Pastikan data baru selalu berstatus UNVERIFIED
+    await this.ormRepo.save({
+      id,
+      userId: data.userId.trim(),
+      storedFileId: data.storedFileId.trim(),
+      imageUrl: data.imageUrl.trim(),
+      status: PredictionStatus.PENDING,
+      curationStatus: CurationStatus.UNVERIFIED,
+      isVerified: null, 
+    });
 
-    const created = await this.ormRepo.findOne({ where: { id } });
-
-    if (!created) {
-      throw new InternalServerErrorException(
-        `Prediction berhasil di-INSERT tapi tidak ditemukan saat SELECT. id=${id}`,
-      );
-    }
-
+    const created = await this.findById(id);
+    if (!created) throw new InternalServerErrorException(`Gagal menemukan prediction. id=${id}`);
+    
     return created;
   }
 
   async updateResult(
-    id:     string,
+    id: string,
     result: PredictionResultPayload,
   ): Promise<PredictionEntity> {
     await this.ormRepo.update(id, {
-      varietyCode:     result.varietyCode,
-      varietyName:     result.varietyName,
-      localName:       result.localName,
-      origin:          result.origin,
-      description:     result.description,
+      varietyCode: result.varietyCode,
+      varietyName: result.varietyName,
+      localName: result.localName,
+      origin: result.origin,
+      description: result.description,
       confidenceScore: result.confidenceScore,
-      imageEnhanced:   result.imageEnhanced,
+      imageEnhanced: result.imageEnhanced,
       inferenceTimeMs: result.inferenceTimeMs,
-      allVarieties:    result.allVarieties,
-      modelVersion:    result.modelVersion,
-      aiRequestId:     result.aiRequestId,
-      status:          PredictionStatus.SUCCESS,
+      allVarieties: result.allVarieties,
+      modelVersion: result.modelVersion,
+      aiRequestId: result.aiRequestId,
+      status: PredictionStatus.SUCCESS,
     });
 
     const updated = await this.findById(id);
-
-    if (!updated) {
-      throw new Error(
-        `Prediction id='${id}' tidak ditemukan setelah updateResult.`,
-      );
-    }
-
+    if (!updated) throw new Error(`Prediction id='${id}' tidak ditemukan setelah update.`);
     return updated;
   }
 
   async markAsFailed(id: string, reason: string): Promise<void> {
-    const result = await this.ormRepo.update(id, {
-      status:       PredictionStatus.FAILED,
+    await this.ormRepo.update(id, {
+      status: PredictionStatus.FAILED,
       errorMessage: reason,
     });
-
-    if (result.affected === 0) {
-      console.warn(
-        `[PredictionRepository] markAsFailed: id='${id}' tidak ditemukan ` +
-        `(0 rows affected). reason='${reason}'`,
-      );
-    }
   }
 
   async findByStatus(status: string): Promise<PredictionEntity[]> {
@@ -145,48 +111,53 @@ export class PredictionRepository implements IPredictionRepository {
     });
   }
 
-async findAllForAdmin(
-  filter: AdminPredictionFilter,
-): Promise<[PredictionEntity[], number]> {
-  const qb = this.ormRepo.createQueryBuilder('p');
+  // --- FUNGSI INI YANG MEMASTIKAN HALAMAN KURASI & DATASET TERPISAH ---
+  async findAllForAdmin(
+    filter: AdminPredictionFilter,
+  ): Promise<[PredictionEntity[], number]> {
+    const qb = this.ormRepo.createQueryBuilder('p');
 
-  // 1. Filter Status (Jika ada)
-  if (filter.status) {
-    qb.andWhere('p.status = :status', { status: filter.status });
+    if (filter.status) {
+      qb.andWhere('p.status = :status', { status: filter.status });
+    }
+
+    if (filter.varietyCode) {
+      qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
+    }
+
+    // Filter CurationStatus yang tahan banting (Bisa menerima true/false maupun VERIFIED/UNVERIFIED dari URL)
+    if (filter.isCurated !== undefined && filter.isCurated !== null) {
+      const isCuratedStr = String(filter.isCurated).toUpperCase();
+      
+      if (isCuratedStr === 'TRUE' || isCuratedStr === 'VERIFIED') {
+        qb.andWhere('p.curationStatus = :curationStatus', { curationStatus: CurationStatus.VERIFIED });
+      } else if (isCuratedStr === 'FALSE' || isCuratedStr === 'UNVERIFIED') {
+        qb.andWhere('p.curationStatus = :curationStatus', { curationStatus: CurationStatus.UNVERIFIED });
+      }
+    }
+
+    // Tambahan safety untuk pagination
+    const skipValue = isNaN(Number(filter.skip)) ? 0 : Number(filter.skip);
+    const limitValue = isNaN(Number(filter.limit)) ? 20 : Number(filter.limit);
+
+    qb.orderBy('p.createdAt', 'DESC')
+      .skip(skipValue)
+      .take(limitValue);
+
+    return qb.getManyAndCount();
   }
 
-  // 2. Filter Variety (Jika ada)
-  if (filter.varietyCode) {
-    qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
-  }
-
-  // 3. Filter Curation (Satu-satunya yang menentukan tampilan di UI)
-  if (filter.isCurated !== undefined && filter.isCurated !== null) {
-    const isCurated = String(filter.isCurated).toLowerCase() === 'true';
-    
-    // Gunakan string literal langsung agar tidak ada salah enum mapping
-    const status = isCurated ? 'VERIFIED' : 'UNVERIFIED';
-    
-    qb.andWhere('p.curationStatus = :status', { status: status });
-  }
-
-  // 4. Sorting & Pagination
-  qb.orderBy('p.createdAt', 'DESC')
-    .skip(filter.skip || 0)
-    .take(filter.limit || 20);
-
-  return qb.getManyAndCount();
-}
-
+  // --- FUNGSI INI YANG MEMINDAHKAN DATA DARI KURASI KE DATASET ---
   async verify(id: string, data: VerifyPredictionData): Promise<PredictionEntity> {
     const updatePayload: Partial<PredictionEntity> = {
       isVerified: data.isVerified,
-      curationStatus: CurationStatus.VERIFIED,
+      curationStatus: CurationStatus.VERIFIED, // Data otomatis pindah halaman!
       adminNote: data.adminNote ?? null,
       verifiedAt: new Date(),
     };
 
     if (!data.isVerified && data.correctedVarietyCode) {
+      updatePayload.actualVarietyCode = data.correctedVarietyCode;
       updatePayload.varietyCode = data.correctedVarietyCode;
       updatePayload.varietyName = resolveVarietyName(data.correctedVarietyCode);
     }
@@ -205,23 +176,18 @@ async findAllForAdmin(
     }
   }
 
+  // --- FILTER EXPORT DATA HARUS MERUJUK KE CurationStatus ---
   async findEligibleForBulkAdd(filter: BulkAddFilter): Promise<PredictionEntity[]> {
-    const qb = this.ormRepo.createQueryBuilder('prediction')
-      .where('prediction.status = :status', { status: PredictionStatus.SUCCESS })
-      .andWhere('prediction.confidenceScore >= :minConfidence', {
-        minConfidence: filter.minConfidence
-      });
+    const qb = this.ormRepo.createQueryBuilder('p')
+      .where('p.status = :status', { status: PredictionStatus.SUCCESS })
+      .andWhere('p.confidenceScore >= :minConfidence', { minConfidence: filter.minConfidence });
 
     if (filter.varietyCode !== null) {
-      qb.andWhere('prediction.varietyCode = :varietyCode', {
-        varietyCode: filter.varietyCode
-      });
+      qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
     }
 
     if (filter.onlyVerified) {
-      qb.andWhere('prediction.isVerified = :isVerified', {
-        isVerified: true,
-      });
+      qb.andWhere('p.curationStatus = :curationStatus', { curationStatus: CurationStatus.VERIFIED });
     }
 
     return qb.getMany();
@@ -231,9 +197,9 @@ async findAllForAdmin(
     return this.ormRepo.find({
       where: {
         status: PredictionStatus.SUCCESS,
-        isVerified: Not(IsNull())
+        curationStatus: CurationStatus.VERIFIED,
       },
-      select: ['id', 'varietyCode', 'imageUrl']
-    })
+      select: ['id', 'varietyCode', 'imageUrl'],
+    });
   }
 }
