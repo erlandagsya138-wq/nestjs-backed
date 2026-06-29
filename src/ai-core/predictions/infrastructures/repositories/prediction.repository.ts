@@ -126,11 +126,19 @@ export class PredictionRepository implements IPredictionRepository {
       qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
     }
 
-    // Hanya jika DTO mengizinkan isCurated (true / false)
+    // GANTI BAGIAN INI:
     if (filter.isCurated !== undefined) {
-      // Jika true -> VERIFIED. Jika false -> UNVERIFIED.
-      const targetStatus = filter.isCurated ? CurationStatus.VERIFIED : CurationStatus.UNVERIFIED;
-      qb.andWhere('p.curationStatus = :curationStatus', { curationStatus: targetStatus });
+      if (filter.isCurated === true) {
+        // Halaman Dataset: Hanya ambil yang benar-benar sudah VERIFIED
+        qb.andWhere('p.curationStatus = :curationStatus', {
+          curationStatus: CurationStatus.VERIFIED
+        });
+      } else {
+        // Halaman Kurasi AI: Ambil yang UNVERIFIED ATAU yang datanya masih NULL
+        qb.andWhere('(p.curationStatus = :curationStatus OR p.curationStatus IS NULL)', {
+          curationStatus: CurationStatus.UNVERIFIED
+        });
+      }
     }
 
     qb.orderBy('p.createdAt', 'DESC')
