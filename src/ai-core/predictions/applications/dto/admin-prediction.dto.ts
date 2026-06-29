@@ -1,6 +1,6 @@
 // src/ai-core/predictions/applications/dto/admin-prediction.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { PredictionStatus } from '../../domains/entities/prediction.entity';
 
@@ -32,6 +32,7 @@ export class AdminListPredictionsQueryDto {
   readonly varietyCode?: string;
 
   @ApiPropertyOptional({ description: 'Filter status verifikasi: true/false' })
+  @Type(() => String)
   @Transform(({ value }) => {
     const val = String(value).toUpperCase();
     if (val === 'TRUE' || val === '1') return true;
@@ -43,6 +44,7 @@ export class AdminListPredictionsQueryDto {
   readonly isVerified?: boolean;
 
   @ApiPropertyOptional({ description: 'Filter data yang sudah dikurasi (true) atau belum (false)' })
+  @Type(() => String)
   @Transform(({ value }) => {
     const val = String(value).toUpperCase();
     // Jika URL mengandung isCurated=true, 1, atau VERIFIED -> diubah ke boolean true
