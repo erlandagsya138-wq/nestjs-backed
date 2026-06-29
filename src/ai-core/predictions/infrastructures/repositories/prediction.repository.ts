@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   PredictionEntity,
   PredictionStatus,
+  CurationStatus
 } from '../../domains/entities/prediction.entity';
 import { BulkAddFilter } from './prediction.repository.interface';
 import {
@@ -78,6 +79,7 @@ export class PredictionRepository implements IPredictionRepository {
         storedFileId: data.storedFileId.trim(),
         imageUrl:     data.imageUrl.trim(),
         status:       PredictionStatus.PENDING,
+        curationStatus: CurationStatus.UNVERIFIED,
       })
       .execute();
 
@@ -148,6 +150,7 @@ async findAllForAdmin(
 ): Promise<[PredictionEntity[], number]> {
   const qb = this.ormRepo.createQueryBuilder('p');
 
+  // Filter dasar (Status & Variety) tetap sama
   if (filter.status) {
     qb.andWhere('p.status = :status', { status: filter.status });
   }
@@ -156,26 +159,22 @@ async findAllForAdmin(
     qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
   }
 
-  // Menangani filter isCurated dengan aman
+  // --- PERUBAHAN UTAMA: Gunakan CurationStatus ---
   if (filter.isCurated !== undefined && filter.isCurated !== null) {
+    // Kita anggap filter.isCurated = true adalah untuk Dataset (VERIFIED)
+    // dan false untuk Kurasi AI (UNVERIFIED)
     const isCurated = String(filter.isCurated) === 'true';
 
     if (isCurated) {
-      // DATASET: Ambil yang sudah diisi (1 atau 0)
-      // Kita gunakan Not(IsNull()) untuk menangkap angka 1 dan 0
-      qb.andWhere({ isVerified: Not(IsNull()) });
+      qb.andWhere('p.curationStatus = :status', { status: CurationStatus.VERIFIED });
     } else {
-      // KURASI AI: Ambil yang BENAR-BENAR NULL (kosong)
-      qb.andWhere({ isVerified: IsNull() });
+      qb.andWhere('p.curationStatus = :status', { status: CurationStatus.UNVERIFIED });
     }
   }
 
   qb.orderBy('p.createdAt', 'DESC')
     .skip(filter.skip)
     .take(filter.limit);
-
-  // DEBUG: Jika masih tidak tampil, hapus komentar di bawah ini untuk melihat query asli di terminal
-  // console.log("Executing Query:", qb.getSql(), qb.getParameters());
 
   return qb.getManyAndCount();
 }

@@ -21,33 +21,24 @@ export enum PredictionStatus {
   FAILED  = 'FAILED',
 }
 
-// Transformer untuk decimal agar tidak menjadi string di MySQL
+export enum CurationStatus {
+  UNVERIFIED = 'UNVERIFIED',
+  VERIFIED   = 'VERIFIED',
+}
+
 const decimalTransformer: ValueTransformer = {
   to: (v: number | null) => v,
-  from: (v: string | null): number | null => {
-    if (v === null || v === undefined) return null;
-    const n = parseFloat(v);
-    return isNaN(n) ? null : n;
-  },
+  from: (v: string | null): number | null => (v === null ? null : parseFloat(v)),
 };
-
-// 1. Tambahkan transformer di atas class PredictionEntity
-  const booleanTransformer: ValueTransformer = {
-    to: (v: boolean | null) => (v === null ? null : v ? 1 : 0), // Simpan boolean jadi 1 atau 0
-    from: (v: any) => (v === null ? null : v === 1 || v === true), // Baca 1 atau true jadi boolean
-  };
 
 @Entity({ name: 'predictions' })
 export class PredictionEntity {
-  // ── Primary Key ──────────────────────────────────────────────
   @PrimaryColumn({ type: 'varchar', length: 36 })
   id: string = '';
 
   @BeforeInsert()
   generateId(): void {
-    if (!this.id || this.id.trim().length === 0) {
-      this.id = uuidv4();
-    }
+    if (!this.id) this.id = uuidv4();
   }
 
   // ── Foreign Keys ─────────────────────────────────────────────
@@ -57,107 +48,80 @@ export class PredictionEntity {
   @Column({ type: 'varchar', length: 36, nullable: false, unique: true })
   storedFileId: string = '';
 
-  // ── AI Result — Core ─────────────────────────────────────────
-  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
+  // ── AI Core Data ─────────────────────────────────────────────
+  @Column({ type: 'varchar', length: 100, nullable: true })
   varietyCode: string | null = null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   varietyName: string | null = null;
 
-  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   localName: string | null = null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   origin: string | null = null;
 
-  @Column({ type: 'text', nullable: true, default: null })
+  @Column({ type: 'text', nullable: true })
   description: string | null = null;
 
-  @Column({
-    type:        'decimal',
-    precision:   5,
-    scale:       4,
-    nullable:    true,
-    default:     null,
-    transformer: decimalTransformer,
-  })
+  @Column({ type: 'decimal', precision: 5, scale: 4, nullable: true, transformer: decimalTransformer })
   confidenceScore: number | null = null;
 
-  // ── AI Result — Metadata ─────────────────────────────────────
-  @Column({ type: 'boolean', nullable: true, default: null })
+  @Column({ type: 'json', nullable: true })
+  allVarieties: { varietyCode: string; varietyName: string; confidenceScore: number }[] | null = null;
+
+  // ── Metadata & AI Performance ───────────────────────────────
+  @Column({ type: 'boolean', nullable: true })
   imageEnhanced: boolean | null = null;
 
-  @Column({
-    type:        'decimal',
-    precision:   10,
-    scale:       2,
-    nullable:    true,
-    default:     null,
-    transformer: decimalTransformer,
-  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true, transformer: decimalTransformer })
   inferenceTimeMs: number | null = null;
 
-  // Semua varietas dengan skor (disimpan sebagai JSON array)
-  @Column({ type: 'json', nullable: true, default: null })
-  allVarieties: {
-    varietyCode:     string;
-    varietyName:     string;
-    confidenceScore: number;
-  }[] | null = null;
-
-  @Column({ type: 'varchar', length: 20, nullable: true, default: null })
+  @Column({ type: 'varchar', length: 20, nullable: true })
   modelVersion: string | null = null;
 
-  @Column({ type: 'varchar', length: 36, nullable: true, default: null })
+  @Column({ type: 'varchar', length: 36, nullable: true })
   aiRequestId: string | null = null;
 
   @Column({ type: 'varchar', length: 512, nullable: false })
   imageUrl: string = '';
 
-  // ── Status Tracking ──────────────────────────────────────────
-  @Column({
-    type:    'enum',
-    enum:    PredictionStatus,
-    default: PredictionStatus.PENDING,
-  })
+  // ── Status & Error Tracking ──────────────────────────────────
+  @Column({ type: 'enum', enum: PredictionStatus, default: PredictionStatus.PENDING })
   status: PredictionStatus = PredictionStatus.PENDING;
 
-  @Column({ type: 'text', nullable: true, default: null })
+  @Column({ type: 'text', nullable: true })
   errorMessage: string | null = null;
 
-  // ── Admin Verification Fields (Human-in-the-loop) ────────────
-  @Column({
-    type: 'boolean',
-    nullable: true,
-    default: null,
-    transformer: booleanTransformer
+  // ── Curation Status (Pembeda Mutlak) ─────────────────────────
+  @Column({ 
+    type: 'enum', 
+    enum: CurationStatus, 
+    default: CurationStatus.UNVERIFIED 
   })
-  isVerified: boolean | null = null;
+  curationStatus: CurationStatus = CurationStatus.UNVERIFIED;
 
-  @Column({ type: 'timestamp', nullable: true, default: null })
-  verifiedAt: Date | null = null;
+  @Column({ type: 'boolean', nullable: true })
+  isVerified: boolean | null = null; 
 
-  @Column({ type: 'text', nullable: true, default: null })
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  actualVarietyCode: string | null = null;
+
+  @Column({ type: 'text', nullable: true })
   adminNote: string | null = null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
-  actualVarietyCode: string | null = null;
+  @Column({ type: 'timestamp', nullable: true })
+  verifiedAt: Date | null = null;
 
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date = new Date();
 
   // ── Relations ────────────────────────────────────────────────
-  @ManyToOne(() => UserEntity, (user) => user.predictions, {
-    onDelete:  'CASCADE',
-    nullable:  false,
-  })
+  @ManyToOne(() => UserEntity, (user) => user.predictions, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user!: Relation<UserEntity>;
 
-  @OneToOne(() => StoredFileEntity, (sf) => sf.prediction, {
-    onDelete: 'RESTRICT',
-    nullable: false,
-  })
+  @OneToOne(() => StoredFileEntity, (sf) => sf.prediction, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'storedFileId' })
   storedFile!: Relation<StoredFileEntity>;
 }
