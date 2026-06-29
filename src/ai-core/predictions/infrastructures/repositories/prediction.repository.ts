@@ -1,7 +1,7 @@
 // src/ai-core/predictions/infrastructures/repositories/prediction.repository.ts
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not, IsNull } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   PredictionEntity,
@@ -14,6 +14,7 @@ import {
   CreatePredictionData,
 } from './prediction.repository.interface';
 import { VerifyPredictionData } from './prediction.repository.interface';
+import { resolveVarietyName } from '../../../ai-integration/domains/constants/variety.constants';
 
 @Injectable()
 export class PredictionRepository implements IPredictionRepository {
@@ -144,35 +145,24 @@ export class PredictionRepository implements IPredictionRepository {
   async findAllForAdmin(filter: import('./prediction.repository.interface').AdminPredictionFilter): Promise<[PredictionEntity[], number]> {
     const qb = this.ormRepo.createQueryBuilder('p');
 
-    // 1. Filter Status Umum (SUCCESS, FAILED, PENDING)
     if (filter.status) {
       qb.andWhere('p.status = :status', { status: filter.status });
     }
 
-    // 2. Filter Kode Varietas
     if (filter.varietyCode) {
       qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
     }
 
-    // 3. Filter Tab Kurasi (Sudah disentuh admin vs Belum)
-    //    Jika isCurated dikirim, filter ini mengambil alih sepenuhnya.
-    //    isVerified TIDAK boleh aktif bersamaan karena keduanya
-    //    beroperasi pada kolom yang sama (isVerified).
     if (filter.isCurated === true) {
-      // Halaman Dataset: Hanya data yang sudah divalidasi admin (isVerified = true ATAU false)
       qb.andWhere('p.isVerified IS NOT NULL');
     } else if (filter.isCurated === false) {
-      // Halaman Kurasi: Hanya data antrean yang belum disentuh admin sama sekali
       qb.andWhere('p.isVerified IS NULL');
     } else {
-      // 4. Filter Akurasi Spesifik — hanya aktif jika isCurated TIDAK dikirim
-      //    (Hanya mencari yang "Benar" atau "Salah" secara spesifik)
       if (filter.isVerified !== undefined && filter.isVerified !== null) {
         qb.andWhere('p.isVerified = :isVerified', { isVerified: filter.isVerified });
       }
     }
 
-    // 5. Sorting & Pagination
     qb.orderBy('p.createdAt', 'DESC')
       .skip(filter.skip)
       .take(filter.limit);
@@ -188,7 +178,8 @@ export class PredictionRepository implements IPredictionRepository {
     };
 
     if (!data.isVerified && data.correctedVarietyCode) {
-      updatePayload.actualVarietyCode = data.correctedVarietyCode;
+      updatePayload.varietyCode = data.correctedVarietyCode;
+      updatePayload.varietyName = resolveVarietyName(data.correctedVarietyCode);
     }
 
     await this.ormRepo.update(id, updatePayload);
@@ -231,7 +222,7 @@ export class PredictionRepository implements IPredictionRepository {
     return this.ormRepo.find({
       where: {
         status: PredictionStatus.SUCCESS,
-        isVerified: true
+        isVerified: Not(IsNull())
       },
       select: ['id', 'varietyCode', 'imageUrl']
     })
