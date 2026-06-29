@@ -55,10 +55,6 @@ export class PredictionExceptionFilter implements ExceptionFilter {
       error: exception.name,
     };
 
-    this.logger.warn(
-      `[${req.method}] ${req.url} → ${status}: ${JSON.stringify(message)}`,
-    );
-
     res.status(status).json(body);
   }
 }

@@ -126,19 +126,13 @@ export class PredictionRepository implements IPredictionRepository {
       qb.andWhere('p.varietyCode = :varietyCode', { varietyCode: filter.varietyCode });
     }
 
-    // GANTI BAGIAN INI:
+    if (filter.isVerified !== undefined) {
+      qb.andWhere('p.isVerified = :isVerified', { isVerified: filter.isVerified });
+    }
+
     if (filter.isCurated !== undefined) {
-      if (filter.isCurated === true) {
-        // Halaman Dataset: Hanya ambil yang benar-benar sudah VERIFIED
-        qb.andWhere('p.curationStatus = :curationStatus', {
-          curationStatus: CurationStatus.VERIFIED
-        });
-      } else {
-        // Halaman Kurasi AI: Ambil yang UNVERIFIED ATAU yang datanya masih NULL
-        qb.andWhere('(p.curationStatus = :curationStatus OR p.curationStatus IS NULL)', {
-          curationStatus: CurationStatus.UNVERIFIED
-        });
-      }
+      const targetStatus = filter.isCurated ? CurationStatus.VERIFIED : CurationStatus.UNVERIFIED;
+      qb.andWhere('p.curationStatus = :curationStatus', { curationStatus: targetStatus });
     }
 
     qb.orderBy('p.createdAt', 'DESC')

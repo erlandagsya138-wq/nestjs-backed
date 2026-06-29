@@ -37,11 +37,9 @@ export class FindPredictionsByUserUseCase {
         if (item.status === 'SUCCESS' && item.varietyCode) {
           try {
             const priceSummary = await this.marketIntelligenceOrchestrator.getPriceSummaryByVariety(item.varietyCode);
-            item.marketPriceSummary = priceSummary || {
-              minPriceKg: 0, maxPriceKg: 0, avgPriceKg: 0, totalListings: 0
-            };
+            item.marketPriceSummary = priceSummary ?? null;
           } catch (err) {
-            this.logger.error(`Gagal ambil harga di list untuk ${item.varietyCode}`);
+            this.logger.error(`[FindPredictionsByUser] Gagal ambil harga pasar untuk varietas ${item.varietyCode}`);
             item.marketPriceSummary = null;
           }
         }

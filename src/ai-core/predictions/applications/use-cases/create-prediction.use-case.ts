@@ -71,19 +71,19 @@ export class CreatePredictionUseCase {
       );
     }
 
-    // ── Step 1: Upload file & persist StoredFileEntity ───────────────────
-    let storedFileId: string;
-    let imageUrl:     string;
-    let imageBuffer:  Buffer;
-    let imageMimeType: string;
-
-    // ── Step 3: Validasi MIME type ────────────────────────────────────────
+    // ── Step 1: Validasi MIME type sebelum upload ─────────────────────────
     const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
       throw new UnprocessableEntityException(
         `Tipe file '${file.mimetype}' tidak didukung. Harap unggah gambar JPG/PNG/WebP.`
       );
     }
+
+    // ── Step 2: Upload file & persist StoredFileEntity ───────────────────
+    let storedFileId: string;
+    let imageUrl:     string;
+    let imageBuffer:  Buffer;
+    let imageMimeType: string;
 
     try {
       const uploadResult = await this.uploadFileUseCase.execute(
@@ -105,7 +105,7 @@ export class CreatePredictionUseCase {
       );
     }
 
-    // ── Step 2: Buat PredictionEntity PENDING ────────────────────────────
+    // ── Step 3: Buat PredictionEntity PENDING dengan imageUrl ─────────────
     const prediction = await this.predictionRepo.create({
       userId:       authenticatedUserId.trim(),
       storedFileId,
@@ -126,7 +126,7 @@ export class CreatePredictionUseCase {
       ),
     );
 
-    // ── Step 4: Kirim ke AI dengan Type-Safe Error Handling ───────────────
+    // ── Step 4: Kirim ke AI untuk dianalisis ─────────────────────────────
     this.logger.log(`[Create] Mengirim ke AI → id=${prediction.id}`);
 
     try {

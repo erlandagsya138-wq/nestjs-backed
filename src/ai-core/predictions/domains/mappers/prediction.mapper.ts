@@ -36,10 +36,11 @@ export class PredictionMapper {
       allVarieties:    entity.allVarieties ?? null,
       modelVersion:    entity.modelVersion,
       aiRequestId:     entity.aiRequestId,
-      isVerified: entity.isVerified !== null ? Boolean(Number(entity.isVerified)) : null,
+      isVerified:        entity.isVerified !== null ? Boolean(Number(entity.isVerified)) : null,
       adminNote:         entity.adminNote ?? null,
       actualVarietyCode: entity.actualVarietyCode ?? null,
       verifiedAt:        entity.verifiedAt ?? null,
+      marketPriceSummary: null,
     };
   }
 
