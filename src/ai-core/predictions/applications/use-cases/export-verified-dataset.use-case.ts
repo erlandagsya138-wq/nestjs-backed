@@ -1,5 +1,4 @@
-// src/predictions/applications/use-cases/export-verified-dataset.use-case.ts
-import { Inject, Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Response } from 'express';
 import * as archiver from 'archiver';
 import axios from 'axios';
@@ -15,37 +14,110 @@ export class ExportVerifiedDatasetUseCase {
   ) {}
 
   async execute(res: Response): Promise<void> {
-    const predictions = await this.predictionRepo.findVerifiedForExport();
+    try {
+      const predictions = await this.predictionRepo.findVerifiedForExport();
 
-    if (predictions.length === 0) {
-      throw new InternalServerErrorException('Belum ada data prediksi yang terverifikasi.');
-    }
+      if (predictions.length === 0) {
+        res.status(404).json({
+          statusCode: 404,
+          error: 'Not Found',
+          message: 'Belum ada data prediksi yang terverifikasi untuk diexport.'
+        });
+        return;
+      }
 
-    const dateStr = new Date().toISOString().split('T')[0];
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename=dataset_export_${dateStr}.zip`);
+      const dateStr = new Date().toISOString().split('T')[0];
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename=dataset_export_${dateStr}.zip`);
 
-    const archive = archiver('zip', { zlib: { level: 9 } });
-    
-    archive.pipe(res);
+      const archive = archiver.create('zip', { zlib: { level: 0 } });
+      
+      archive.on('error', (err: Error) => {
+        this.logger.error(`Archiver error: ${err.message}`, err.stack);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Gagal memproses file ZIP.' });
+        } else {
+          res.end(); 
+        }
+      });
 
-    this.logger.log(`Memulai export ${predictions.length} data dataset...`);
+      archive.pipe(res);
 
-    for (const p of predictions) {
-      const folderName = p.varietyCode ? p.varietyCode.toUpperCase() : 'UNKNOWN';
-      const fileName = `img_${p.id}.jpg`;
+      this.logger.log(`Memulai export ${predictions.length} gambar ke ZIP...`);
 
-      try {
-        const response = await axios.get(p.imageUrl, { responseType: 'stream' });
+      const manifestEntries: Array<{
+        id: string;
+        varietyCode: string | null;
+        status: 'SUCCESS' | 'FAILED';
+        fileName?: string;
+        error?: string;
+      }> = [];
 
-        archive.append(response.data, { name: `${folderName}/${fileName}` });
-      } catch (error) {
-        this.logger.warn(`Gagal mengunduh gambar untuk prediksi ID: ${p.id}. Melewati file ini.`);
+      let successCount = 0;
+      let failedCount = 0;
+
+      for (const p of predictions) {
+        const folderName = p.varietyCode ? p.varietyCode.toUpperCase() : 'UNKNOWN';
+        const fileName = `img_${p.id}.jpg`;
+
+        try {
+          const response = await axios.get(p.imageUrl, { 
+            responseType: 'arraybuffer',
+            timeout: 10000 
+          });
+
+          archive.append(Buffer.from(response.data), { name: `${folderName}/${fileName}` });
+          
+          manifestEntries.push({
+            id: p.id,
+            varietyCode: p.varietyCode,
+            fileName: fileName,
+            status: 'SUCCESS'
+          });
+          successCount++;
+        } catch (error: unknown) {
+          // Type-safe error extraction
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          
+          this.logger.warn(`Gagal mengunduh gambar ID: ${p.id}. Melewati file ini. Error: ${errorMessage}`);
+          manifestEntries.push({
+            id: p.id,
+            varietyCode: p.varietyCode,
+            status: 'FAILED',
+            error: errorMessage
+          });
+          failedCount++;
+        }
+      }
+
+      const manifest = {
+        exportedAt: new Date().toISOString(),
+        totalRequested: predictions.length,
+        totalSuccess: successCount,
+        totalFailed: failedCount,
+        details: manifestEntries
+      };
+
+      archive.append(JSON.stringify(manifest, null, 2), { name: 'dataset_manifest.json' });
+
+      await archive.finalize();
+      this.logger.log(`Export ZIP selesai. Berhasil: ${successCount} | Gagal: ${failedCount}`);
+
+    } catch (error: unknown) {
+      // Type-safe error extraction
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(`Kesalahan sistem saat export ZIP: ${errorMessage}`, errorStack);
+      if (!res.headersSent) {
+        res.status(500).json({
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Terjadi kesalahan sistem saat memproses export ZIP.'
+        });
+      } else {
+        res.end();
       }
     }
-
-    // Tutup archive (menyelesaikan proses ZIP)
-    await archive.finalize();
-    this.logger.log(`Export ZIP selesai.`);
   }
 }
