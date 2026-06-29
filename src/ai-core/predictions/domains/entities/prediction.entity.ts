@@ -129,6 +129,9 @@ export class PredictionEntity {
   @Column({ type: 'text', nullable: true, default: null })
   adminNote: string | null = null;
 
+  @Column({ type: 'varchar', length: 100, nullable: true, default: null })
+  actualVarietyCode: string | null = null;
+
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date = new Date();
 
