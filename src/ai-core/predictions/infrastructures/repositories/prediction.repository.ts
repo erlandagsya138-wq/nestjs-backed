@@ -175,6 +175,9 @@ export class PredictionRepository implements IPredictionRepository {
       .skip(filter.skip)
       .take(filter.limit);
 
+      console.log('🔴 [DEBUG SQL] Filter yang diterima Repo:', filter);
+    console.log('🔴 [DEBUG SQL] Query Database:', qb.getSql());
+
     return qb.getManyAndCount();
   }
 
