@@ -21,6 +21,7 @@ import { MarketIntelligenceModule } from '../market-intelligence/market-intellig
 import { FindAllPredictionsAdminUseCase } from './applications/use-cases/find-all-predictions-admin.use-case';
 import { VerifyPredictionUseCase } from './applications/use-cases/verify-prediction.use-case';
 import { ExportVerifiedDatasetUseCase } from './applications/use-cases/export-verified-dataset.use-case';
+import { DeletePredictionUseCase } from './applications/use-cases/delete-prediction.use-case';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { ExportVerifiedDatasetUseCase } from './applications/use-cases/export-ve
     FindAllPredictionsAdminUseCase,
     VerifyPredictionUseCase,
     ExportVerifiedDatasetUseCase,
+    DeletePredictionUseCase,
   ],
   exports: [
     PREDICTION_REPOSITORY_TOKEN,
